@@ -1,0 +1,719 @@
+<title>Perk GTM Engine · Massimo Mauri</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: five views behind a sticky tab bar (hash-routed). Each view is one focused reading task, 1-2 screens long. */
+:root {
+  --bg: #F4F6F7;
+  --surface: #FFFFFF;
+  --sunken: #E9EEF0;
+  --ink: #10171B;
+  --ink-2: #33414A;
+  --ink-3: #56646C;
+  --line: #D3DCE0;
+  --accent: #0B6B64;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #D4EDEA;
+  --signal: #9A4A06;
+  --signal-soft: #FAE8D2;
+  --crit: #A61E28;
+  --crit-soft: #F7DCDE;
+  --violet: #5B4BB7;
+  --violet-soft: #E6E2F8;
+  --f-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --r: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1214; --surface: #151C1F; --sunken: #1C2529; --ink: #EEF3F5; --ink-2: #C3CED3; --ink-3: #9AA8AF;
+    --line: #2B373C; --accent: #55C7BA; --accent-ink: #062320; --accent-soft: #123A36; --signal: #F2A65E; --signal-soft: #3A2814;
+    --crit: #F27C83; --crit-soft: #3D1C1F; --violet: #A99CF2; --violet-soft: #2A2547; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1214; --surface: #151C1F; --sunken: #1C2529; --ink: #EEF3F5; --ink-2: #C3CED3; --ink-3: #9AA8AF;
+  --line: #2B373C; --accent: #55C7BA; --accent-ink: #062320; --accent-soft: #123A36; --signal: #F2A65E; --signal-soft: #3A2814;
+  --crit: #F27C83; --crit-soft: #3D1C1F; --violet: #A99CF2; --violet-soft: #2A2547; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.6; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: -0.015em; line-height: 1.15; }
+h1 { font-size: clamp(2.1rem, 5vw, 3.3rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
+h3 { font-size: 1.15rem; }
+p { margin: 0; }
+ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; }
+a { color: var(--accent); }
+button { font: inherit; color: inherit; }
+button:disabled { opacity: .4; cursor: default; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.lead { font-size: 1.15rem; color: var(--ink-2); max-width: 64ch; }
+.body { color: var(--ink-2); max-width: 68ch; }
+.label { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.muted { color: var(--ink-3); font-size: 0.88rem; }
+.num { font-variant-numeric: tabular-nums; }
+.stack-v { display: grid; gap: 12px; align-content: start; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; min-width: 0; }
+
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 15; background: var(--surface); border-bottom: 1px solid var(--line); }
+.topbar .wrap { display: flex; align-items: center; gap: 16px; min-height: 60px; }
+.brand { font-family: var(--f-display); font-weight: 700; font-size: 1.05rem; white-space: nowrap; }
+.brand small { display: block; font-family: var(--f-body); font-weight: 500; font-size: 0.75rem; color: var(--ink-3); }
+.viewtabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; margin-left: auto; min-width: 0; }
+.viewtabs a { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink-2); font-weight: 500; font-size: 0.92rem; padding: 0 14px; min-height: 44px; border-radius: 8px; white-space: nowrap; }
+.viewtabs a span { font-family: var(--f-mono); font-size: 0.75rem; color: var(--ink-3); }
+.viewtabs a:hover { background: var(--sunken); }
+.viewtabs a[aria-current="page"] { background: var(--ink); color: var(--surface); }
+.viewtabs a[aria-current="page"] span { color: var(--surface); opacity: .7; }
+@media (max-width: 760px) { .topbar .wrap { flex-wrap: wrap; gap: 4px; padding-block: 8px; } .viewtabs { margin-left: 0; width: 100%; } .viewtabs a { padding: 0 10px; } }
+
+.view { padding-block: 40px 56px; }
+.view-head { display: grid; gap: 12px; margin-bottom: 32px; }
+.next { display: flex; justify-content: flex-end; margin-top: 40px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 600; font-size: 0.95rem; text-decoration: none; color: var(--ink); }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.small { min-height: 38px; padding: 0 12px; font-size: 0.88rem; }
+
+.hero { display: grid; gap: 18px; padding-bottom: 32px; }
+.note { font-size: 0.85rem; color: var(--ink-3); border-left: 3px solid var(--line); padding-left: 12px; }
+.facts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
+@media (max-width: 900px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fact { padding: 18px; display: grid; gap: 4px; align-content: start; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 0 -1px -1px 0; }
+.fact b { font-family: var(--f-display); font-size: 1.9rem; font-weight: 600; line-height: 1.1; }
+.fact span { font-size: 0.92rem; color: var(--ink-2); }
+.fact small { font-size: 0.76rem; color: var(--ink-3); }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .grid3, .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .grid3, .grid4 { grid-template-columns: minmax(0, 1fr); } }
+.thesis .n { font-family: var(--f-display); font-size: 0.95rem; color: var(--accent); font-weight: 700; }
+.thesis p { color: var(--ink-2); }
+.block { margin-top: 48px; display: grid; gap: 20px; }
+.timebars { display: grid; gap: 14px; }
+.tb { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 14px; align-items: center; }
+@media (max-width: 620px) { .tb { grid-template-columns: minmax(0, 1fr); gap: 6px; } }
+.timebar { display: flex; height: 44px; border-radius: 8px; overflow: hidden; font-size: 0.82rem; font-weight: 600; }
+.timebar div { display: flex; align-items: center; padding: 0 10px; white-space: nowrap; overflow: hidden; min-width: 0; color: var(--ink); }
+.seg-sell { background: var(--accent); }
+.timebar .seg-sell { color: var(--accent-ink); }
+.seg-res { background: var(--signal-soft); }
+.seg-crm { background: var(--crit-soft); }
+.seg-prep { background: var(--violet-soft); }
+.seg-oth { background: var(--sunken); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 0.88rem; color: var(--ink-2); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.first .card { display: grid; gap: 10px; align-content: start; }
+.first .when { font-size: 0.82rem; font-weight: 700; color: var(--signal); }
+details.sources summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+details.sources ol { padding-left: 20px; display: grid; gap: 4px; font-size: 0.92rem; color: var(--ink-2); }
+
+.arch { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .arch { grid-template-columns: minmax(0, 1fr); } .panel { position: static !important; order: -1; } }
+.layer { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 16px; padding: 14px 8px; border-top: 1px solid var(--line); border-radius: 8px; }
+.layer:first-child { border-top-color: transparent; }
+@media (max-width: 620px) { .layer { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
+.layer.lit { background: var(--accent-soft); border-top-color: transparent; }
+.layer.lit + .layer { border-top-color: transparent; }
+.layer-name { display: grid; gap: 2px; align-content: start; }
+.layer-name b { font-family: var(--f-display); font-size: 1rem; }
+.layer-name span { font-size: 0.86rem; color: var(--ink-3); line-height: 1.35; }
+.layer-name em { font-style: normal; font-family: var(--f-mono); font-size: 0.75rem; color: var(--ink-3); }
+.nodes { display: flex; flex-wrap: wrap; gap: 8px; align-content: start; }
+.node { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 0 12px; font-size: 0.9rem; font-weight: 500; cursor: pointer; }
+.node i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.node:hover { border-color: var(--ink-3); }
+.node.ai { border-style: dashed; border-color: var(--violet); }
+.node[aria-pressed="true"] { border: 1px solid var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.k-sys { background: var(--ink-3); } .k-data { background: var(--accent); } .k-ai { background: var(--violet); } .k-surf { background: var(--signal); }
+.panel { position: sticky; top: 84px; display: grid; gap: 14px; }
+.panel dl { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px 12px; margin: 0; font-size: 0.93rem; }
+.panel dt { color: var(--ink-3); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .05em; padding-top: 2px; }
+.panel dd { margin: 0; }
+.stepper { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.dots { display: flex; gap: 5px; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.dots i.on { background: var(--accent); }
+.chip { display: inline-flex; align-items: center; font-size: 0.8rem; font-weight: 600; padding: 3px 10px; border-radius: 99px; background: var(--sunken); color: var(--ink-2); white-space: nowrap; }
+.chip.accent { background: var(--accent-soft); color: var(--accent); }
+.chip.signal { background: var(--signal-soft); color: var(--signal); }
+.chip.crit { background: var(--crit-soft); color: var(--crit); }
+.chip.violet { background: var(--violet-soft); color: var(--violet); }
+
+.tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { padding: 11px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: 0; }
+th { font-weight: 600; color: var(--ink-3); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em; background: var(--sunken); white-space: nowrap; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.decayline { width: 110px; height: 28px; display: block; }
+
+.roletabs { display: inline-flex; gap: 4px; padding: 4px; background: var(--sunken); border-radius: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.roletabs button { border: 0; background: none; min-height: 40px; padding: 0 16px; border-radius: 9px; cursor: pointer; font-weight: 600; color: var(--ink-2); }
+.roletabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .1); }
+.play { display: grid; gap: 14px; align-content: start; }
+.flow div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 0.93rem; }
+.flow b { font-size: 0.74rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); padding-top: 3px; }
+.proof { background: var(--accent-soft); color: var(--accent); border-radius: 8px; padding: 10px 12px; font-size: 0.9rem; font-weight: 500; }
+
+.howto { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; counter-reset: h; }
+@media (max-width: 760px) { .howto { grid-template-columns: minmax(0, 1fr); } }
+.howto div { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; font-size: 0.93rem; color: var(--ink-2); align-items: start; }
+.howto div::before { counter-increment: h; content: counter(h); width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--surface); display: grid; place-items: center; font-weight: 700; font-size: 0.85rem; }
+.controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 900px) { .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .controls { grid-template-columns: minmax(0, 1fr); } }
+.controls label { display: grid; align-content: start; gap: 4px; font-size: 0.92rem; font-weight: 600; }
+.controls label small { font-weight: 400; color: var(--ink-3); font-size: 0.82rem; }
+.ctl-t { display: flex; justify-content: space-between; gap: 8px; }
+.controls output { font-family: var(--f-mono); font-weight: 500; color: var(--accent); }
+.controls input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; }
+.ctl-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 0.93rem; }
+.parity { display: inline-flex; align-items: center; gap: 8px; }
+.parity i { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; }
+.parity.diff i { background: var(--signal); }
+.outcome { margin-top: 20px; display: grid; align-items: start; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 860px) { .outcome { grid-template-columns: minmax(0, 1fr); } }
+.dist { display: flex; height: 40px; border-radius: 8px; overflow: hidden; margin: 12px 0; }
+.dist div { display: grid; place-items: center; font-weight: 700; font-size: 0.92rem; min-width: 0; }
+.health { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.health b { display: block; font-family: var(--f-display); font-size: 1.45rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.health span { font-size: 0.84rem; color: var(--ink-2); line-height: 1.3; display: block; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 24px 0 12px; }
+.filters button { min-height: 38px; padding: 0 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 0.9rem; font-weight: 500; }
+.filters button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.filters button span { font-family: var(--f-mono); opacity: .7; margin-left: 6px; }
+.proto-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 960px) { .proto-grid { grid-template-columns: minmax(0, 1fr); } .detail { position: static !important; max-height: none !important; } }
+#rows tr { cursor: pointer; }
+#rows tr:hover { background: var(--sunken); }
+#rows tr[aria-selected="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.acct b { display: block; font-weight: 600; }
+.acct small { color: var(--ink-3); font-size: 0.8rem; }
+.tier { display: inline-block; font-family: var(--f-mono); font-weight: 600; font-size: 0.8rem; padding: 2px 7px; border-radius: 5px; }
+.tier.P1 { background: var(--accent); color: var(--accent-ink); }
+.tier.P2 { background: var(--accent-soft); color: var(--accent); }
+.tier.P3 { background: var(--sunken); color: var(--ink-2); }
+.tier.P4 { color: var(--ink-3); border: 1px solid var(--line); }
+.meter { display: inline-block; width: 40px; height: 6px; background: var(--sunken); border-radius: 3px; overflow: hidden; vertical-align: middle; margin-left: 6px; }
+.meter i { display: block; height: 100%; background: var(--signal); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--signal); margin-left: 6px; vertical-align: middle; }
+.detail { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; display: grid; gap: 18px; }
+.detail h3 { font-size: 1.3rem; }
+.sig { display: grid; gap: 4px; }
+.sig .top { display: flex; justify-content: space-between; gap: 10px; font-weight: 600; font-size: 0.92rem; }
+.sig small { color: var(--ink-3); font-size: 0.82rem; }
+.decay { height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
+.decay i { display: block; height: 100%; background: var(--signal); }
+.brief { display: grid; gap: 8px; font-size: 0.93rem; background: var(--bg); border-radius: 10px; padding: 14px; }
+.brief q { font-style: italic; }
+details.more { border-top: 1px solid var(--line); padding-top: 6px; }
+details.more summary { cursor: pointer; font-weight: 600; font-size: 0.92rem; min-height: 38px; display: flex; align-items: center; }
+pre.code { background: var(--sunken); border-radius: 8px; padding: 12px; font-family: var(--f-mono); font-size: 0.78rem; overflow-x: auto; margin: 6px 0 0; line-height: 1.5; color: var(--ink); }
+.log { font-family: var(--f-mono); font-size: 0.8rem; color: var(--ink-2); display: grid; gap: 3px; margin-top: 6px; }
+.notes { margin: 0; padding: 10px 12px 10px 28px; background: var(--signal-soft); color: var(--signal); border-radius: 8px; font-size: 0.9rem; }
+
+.std .card { display: grid; gap: 8px; align-content: start; }
+.std p { color: var(--ink-2); font-size: 0.95rem; }
+.calc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 820px) { .calc { grid-template-columns: minmax(0, 1fr); } }
+.calc-row { display: grid; grid-template-columns: minmax(0, 1fr) 90px 90px; gap: 10px; align-items: center; padding: 5px 0; font-size: 0.94rem; }
+.calc-row input { width: 100%; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-family: var(--f-mono); font-size: 0.92rem; }
+.calc-head { font-size: 0.76rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+.calc-out { display: grid; gap: 18px; align-content: start; background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.calc-out .label { color: var(--accent-soft); }
+.calc-out .muted { color: var(--sunken); }
+.big { font-family: var(--f-display); font-size: 2.5rem; font-weight: 600; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.phase { display: grid; gap: 10px; align-content: start; }
+.phase .when { font-weight: 700; font-size: 0.85rem; color: var(--accent); }
+.phase ul, .tool ul { font-size: 0.94rem; color: var(--ink-2); }
+.tool { display: grid; gap: 10px; align-content: start; justify-items: start; }
+.role { display: grid; gap: 4px; align-content: start; border: 1px dashed var(--line); border-radius: var(--r); padding: 16px; font-size: 0.94rem; color: var(--ink-2); }
+.role b { font-family: var(--f-display); color: var(--ink); font-size: 1rem; }
+footer { padding-block: 28px; border-top: 1px solid var(--line); font-size: 0.85rem; color: var(--ink-3); }
+@media (prefers-reduced-motion: no-preference) { .node, .btn, #rows tr, .layer { transition: background .15s, border-color .15s, box-shadow .15s; } }
+</style>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">Perk GTM Engine<small>Massimo Mauri · Director of GTM Engineering proposal</small></div>
+    <nav class="viewtabs" aria-label="Views">
+      <a href="#summary" data-view="summary"><span>1</span>Summary</a>
+      <a href="#system" data-view="system"><span>2</span>System</a>
+      <a href="#plays" data-view="plays"><span>3</span>Plays</a>
+      <a href="#prototype" data-view="prototype"><span>4</span>Prototype</a>
+      <a href="#plan" data-view="plan"><span>5</span>Plan</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section class="view" data-view="summary">
+  <div class="wrap">
+    <div class="hero">
+      <p class="label">Executive summary · Massimo Mauri</p>
+      <h1>Take the shadow work out of selling</h1>
+      <p class="lead">Perk sells the end of shadow work to 12,000 companies. The same problem sits inside Perk's own 800-person revenue team. I would build the system that gives sellers those hours back, and prove it in pipeline, conversion and expansion.</p>
+      <p class="note">Candidate proposal built on public information. Not affiliated with or endorsed by Perk. Accounts in the prototype are fictional.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b class="num">800</b><span>people in the revenue org</span><small>Job description</small></div>
+      <div class="fact"><b class="num">$300M+</b><span>annual revenue, +48% in 2025</span><small>Perk, Jun 2026</small></div>
+      <div class="fact"><b class="num">40%</b><span>of new EU deals are Travel + Spend</span><small>Perk, Sep 2026</small></div>
+      <div class="fact"><b class="num">30%</b><span>of new business from the US</span><small>Perk, Sep 2026</small></div>
+      <div class="fact"><b class="num">3x</b><span>call volume with Agentforce</span><small>Salesforce story</small></div>
+    </div>
+
+    <div class="block">
+      <h2>Three bets</h2>
+      <div class="grid3">
+        <div class="card thesis stack-v"><span class="n">01</span><h3>Cross-sell is the growth engine</h3><p>Travel customers without Spend are the warmest pipeline Perk has. Perk's own booking data shows who they are and how much they spend.</p></div>
+        <div class="card thesis stack-v"><span class="n">02</span><h3>First-party signals are the moat</h3><p>Bookings, spend volume, admins leaving, support load. Competitors can buy intent data. They can't buy Perk's product data.</p></div>
+        <div class="card thesis stack-v"><span class="n">03</span><h3>Build on what already works</h3><p>Salesforce, Data Cloud and Agentforce are in place. The job is orchestration, data quality and measurement around them.</p></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="stack-v"><h2>The problem, in one picture</h2>
+        <p class="body">An AE's week today and the target. The baseline is an assumption I would replace with a real time study in the first 30 days.</p></div>
+      <div class="timebars">
+        <div class="tb"><b>Today (assumed)</b>
+          <div class="timebar" role="img" aria-label="Today: selling 58 percent, research 14, CRM 12, prep 9, other 7">
+            <div class="seg-sell" style="flex:58">Selling 58%</div><div class="seg-res" style="flex:14">Research 14%</div><div class="seg-crm" style="flex:12">CRM 12%</div><div class="seg-prep" style="flex:9">Prep 9%</div><div class="seg-oth" style="flex:7">7%</div></div></div>
+        <div class="tb"><b>With the engine</b>
+          <div class="timebar" role="img" aria-label="Target: selling 75 percent, research 5, CRM 4, prep 4, other 7">
+            <div class="seg-sell" style="flex:75">Selling 75%</div><div class="seg-res" style="flex:5">5%</div><div class="seg-crm" style="flex:4">4%</div><div class="seg-prep" style="flex:4">4%</div><div class="seg-oth" style="flex:7">7%</div></div></div>
+      </div>
+      <div class="legend"><span><i class="seg-sell"></i>Selling</span><span><i class="seg-res"></i>Account research</span><span><i class="seg-crm"></i>CRM admin</span><span><i class="seg-prep"></i>Meeting prep</span><span><i class="seg-oth"></i>Internal, other</span></div>
+    </div>
+
+    <div class="block first">
+      <h2>What I would ship first</h2>
+      <div class="grid3">
+        <div class="card"><span class="when">Quarter 1 · Account Managers</span><h3>Spend cross-sell from product data</h3><p class="body">Find Travel-only customers with high spend and hand AMs an ROI case built from their own bookings.</p></div>
+        <div class="card"><span class="when">Quarter 1 · Account Executives</span><h3>Meeting prep and CRM autofill</h3><p class="body">A one-page brief before every call and proposed CRM updates after it, approved in one click.</p></div>
+        <div class="card"><span class="when">Quarter 1 · SDRs</span><h3>Signal-based prospecting</h3><p class="body">Feed the existing Agentforce agent with scored accounts and live signals instead of static lists.</p></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <details class="sources"><summary>Public sources used (10)</summary>
+        <ol>
+          <li><a href="https://www.perk.com/job-application/?ashby_jid=bfc6e3fe-4e14-4de5-a2a2-d8f4103e2b06" target="_blank" rel="noopener">Perk: Director of Go-to-Market Engineering, job description</a></li>
+          <li><a href="https://www.perk.com/press-release/perk-secures-300m-credit-facility-to-accelerate-global-growth-of-its-ainative-platform" target="_blank" rel="noopener">Perk secures $300M credit facility (Jun 2026)</a></li>
+          <li><a href="https://www.perk.com/press-release/perk-brings-award-winning-spend-platform-to-the-us-its-fastest-growing-region/" target="_blank" rel="noopener">Perk brings Spend platform to the US (Sep 2026)</a></li>
+          <li><a href="https://www.salesforce.com/customer-stories/perk" target="_blank" rel="noopener">Salesforce customer story: Perk and Prospecting Agent</a></li>
+          <li><a href="https://www.businesstravelnews.com/BTN-Next/Voices/perk-aims-to-adapt-to-future-of-work" target="_blank" rel="noopener">Business Travel News: Perk's AI strategy (Sep 2026)</a></li>
+          <li><a href="https://www.clay.com/guides/gtm-engineering" target="_blank" rel="noopener">Clay: The Complete Guide to GTM Engineering (2026)</a></li>
+          <li><a href="https://www.clay.com/blog/gtm-self-learning-loops" target="_blank" rel="noopener">Clay: Sales plays will ship like software (Oct 2026)</a></li>
+          <li><a href="https://b2bfusiongroup.com/blog/gtm-engineer" target="_blank" rel="noopener">B2B Fusion: How GTM engineers build modern revenue systems</a></li>
+          <li><a href="https://www.getcargo.ai/blog/revenue-pipeline-engineering" target="_blank" rel="noopener">Cargo: Revenue pipeline engineering</a></li>
+          <li><a href="https://www.operators-guild.com/blog/building-a-gtm-engineering-function-that-earns-its-keep" target="_blank" rel="noopener">Operators Guild: Building a GTM engineering function that earns its keep</a></li>
+        </ol>
+      </details>
+    </div>
+    <div class="next"><a class="btn primary" href="#system">Next: the system →</a></div>
+  </div>
+</section>
+
+<section class="view" data-view="system" hidden>
+  <div class="wrap">
+    <div class="view-head"><p class="label">2 · System</p><h2>Eight layers, one source of truth</h2>
+      <p class="lead">Salesforce stays the system of record. Snowflake joins accounts, product usage and signals. Clay enriches at the edge. Decisions live in versioned rules. Click any component, or follow one account through the whole system.</p></div>
+    <div class="legend" style="margin-bottom:16px"><span><i class="k-sys" style="border-radius:50%"></i>System or tool</span><span><i class="k-data" style="border-radius:50%"></i>Data and logic</span><span><i class="k-ai" style="border-radius:50%"></i>AI agent</span><span><i class="k-surf" style="border-radius:50%"></i>Where reps work</span></div>
+    <div class="arch">
+      <div class="layers" id="layers"></div>
+      <aside class="card panel" id="archPanel" aria-live="polite"></aside>
+    </div>
+
+    <div class="block">
+      <div class="stack-v"><h2>Signal contracts</h2>
+        <p class="body">A pricing-page visit matters for days, a new CFO for months. Every signal states its strength, how fast it fades, which motion may use it, when it must not fire and who owns it.</p></div>
+      <div class="tablebox"><table>
+        <thead><tr><th>Signal</th><th>Used for</th><th class="n">Strength</th><th class="n">Half-life</th><th>Fades over 180 days</th><th>Source</th><th>Owner</th></tr></thead>
+        <tbody id="sigRows"></tbody>
+      </table></div>
+    </div>
+    <div class="next"><a class="btn primary" href="#plays">Next: plays by role →</a></div>
+  </div>
+</section>
+
+<section class="view" data-view="plays" hidden>
+  <div class="wrap">
+    <div class="view-head"><p class="label">3 · Plays</p><h2>What the system does for each role</h2>
+      <p class="lead">A few high-impact plays per quarter. Each has a trigger, decision logic, an output the rep actually sees, an owner, and the metric that proves it worked.</p></div>
+    <div class="roletabs" role="tablist" id="roleTabs"></div>
+    <div class="grid3" id="playCards"></div>
+    <div class="next"><a class="btn primary" href="#prototype">Next: see it run →</a></div>
+  </div>
+</section>
+
+<section class="view" data-view="prototype" hidden>
+  <div class="wrap">
+    <div class="view-head"><p class="label">4 · Working prototype</p><h2>The engine, running on 19 demo accounts</h2>
+      <p class="lead">A tested Python pipeline enriched, scored, routed and briefed these fictional accounts. This page shows its real output and lets you change the rules.</p></div>
+    <div class="howto">
+      <div>Move a slider. These are the rules a Sales VP would argue about.</div>
+      <div>Watch where the accounts go: human SDR, AI SDR, AE or AM.</div>
+      <div>Click an account to see why it landed there and what the rep receives.</div>
+    </div>
+    <div class="card">
+      <div class="controls">
+        <label for="wFit"><span class="ctl-t">Fit vs timing <output id="wFitOut"></output></span><input type="range" id="wFit" min="0.2" max="0.8" step="0.05" value="0.55"><small>How priority weighs who should buy against why now</small></label>
+        <label for="p1Fit"><span class="ctl-t">Top tier: minimum fit <output id="p1FitOut"></output></span><input type="range" id="p1Fit" min="50" max="85" step="1" value="65"><small>Fit needed for P1, worked by human SDRs</small></label>
+        <label for="p1Tim"><span class="ctl-t">Top tier: minimum timing <output id="p1TimOut"></output></span><input type="range" id="p1Tim" min="20" max="60" step="1" value="40"><small>Signal strength needed for P1</small></label>
+        <label for="cap"><span class="ctl-t">SDR capacity <output id="capOut"></output></span><input type="range" id="cap" min="1" max="5" step="1" value="2"><small>New P1 accounts per region per run</small></label>
+      </div>
+      <div class="ctl-foot"><span class="parity" id="parity"></span><button class="btn small" id="resetBtn" type="button">Reset to reference run</button></div>
+    </div>
+    <div class="outcome">
+      <div class="card"><h3>Where the 19 accounts went</h3><div class="dist" id="dist" role="img"></div><div class="legend" id="distLegend"></div></div>
+      <div class="card"><h3 style="margin-bottom:12px">Run health</h3><div class="health" id="health"></div></div>
+    </div>
+    <div class="filters" id="filters" role="group" aria-label="Filter accounts by destination"></div>
+    <div class="proto-grid">
+      <div class="tablebox"><table>
+        <thead><tr><th>Account</th><th class="n">Fit</th><th class="n">Timing</th><th>Tier</th><th>Goes to</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <aside class="card detail" id="detail" aria-live="polite"></aside>
+    </div>
+    <div class="next"><a class="btn primary" href="#plan">Next: plan and impact →</a></div>
+  </div>
+</section>
+
+<section class="view" data-view="plan" hidden>
+  <div class="wrap">
+    <div class="view-head"><p class="label">5 · Plan</p><h2>Prove it somewhere, then scale it everywhere</h2>
+      <p class="lead">The first 90 days, the business case, how the team builds safely, and which tools earn their place.</p></div>
+
+    <div class="grid3">
+      <div class="card phase"><span class="when">Days 1–30 · Listen and audit</span><h3>Baseline</h3><ul><li>Ride along with SDR, AE and AM teams in EMEA and NA</li><li>Audit stack, data quality and workflows</li><li>Time study; yield and latency per funnel stage</li><li>Pick 2–3 plays with the VP RevOps and Sales VPs</li></ul></div>
+      <div class="card phase"><span class="when">Days 31–60 · Build with supervision</span><h3>First plays in shadow mode</h3><ul><li>Spend cross-sell from Perk product data</li><li>AE meeting prep and CRM autofill in one region</li><li>Git, tests, evals and run logs in place</li><li>Holdout groups defined before launch</li></ul></div>
+      <div class="card phase"><span class="when">Days 61–90 · Prove and scale</span><h3>Production and roadmap</h3><ul><li>Promote plays that beat control; stop the rest</li><li>First impact readout in pipeline and hours</li><li>Tooling decisions with payback cases</li><li>Next-quarter roadmap and hiring plan</li></ul></div>
+    </div>
+
+    <div class="block">
+      <div class="stack-v"><h2>Business case</h2><p class="body">Every input is an editable assumption, to be replaced with Perk's real numbers. Hours saved builds the case; pipeline per rep proves it.</p></div>
+      <div class="calc">
+        <div class="card">
+          <div class="calc-row calc-head"><span>Role</span><span>Headcount</span><span>Hours saved / week</span></div>
+          <div class="calc-row"><label for="hSDR">SDRs</label><input id="hSDR" type="number" min="0" value="140"><input id="sSDR" type="number" min="0" step="0.5" value="6" aria-label="SDR hours saved per week"></div>
+          <div class="calc-row"><label for="hAE">Account Executives</label><input id="hAE" type="number" min="0" value="300"><input id="sAE" type="number" min="0" step="0.5" value="4" aria-label="AE hours saved per week"></div>
+          <div class="calc-row"><label for="hAM">Account Managers</label><input id="hAM" type="number" min="0" value="180"><input id="sAM" type="number" min="0" step="0.5" value="3" aria-label="AM hours saved per week"></div>
+          <div class="calc-row"><label for="weeks">Selling weeks per year</label><input id="weeks" type="number" min="1" value="44"><span></span></div>
+          <div class="calc-row"><label for="rate">Loaded cost per hour, EUR</label><input id="rate" type="number" min="0" value="45"><span></span></div>
+          <div class="calc-row"><label for="reinvest">Share reinvested in selling, %</label><input id="reinvest" type="number" min="0" max="100" value="60"><span></span></div>
+        </div>
+        <div class="card calc-out" aria-live="polite">
+          <div><p class="label">Hours returned per year</p><p class="big" id="outHours"></p></div>
+          <div><p class="label">Extra selling capacity</p><p class="big" id="outFte"></p><p class="muted">full-time sellers, from the reinvested share at 1,600 h each</p></div>
+          <div><p class="label">Value of time returned</p><p class="big" id="outValue"></p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="stack-v"><h2>Engineering standards</h2><p class="body">Hundreds of sellers will rely on this, so plays ship like software.</p></div>
+      <div class="grid3 std">
+        <div class="card"><h3>Version control</h3><p>Weights, signal contracts, routing rules, prompts and SOQL in git. Every change is a reviewed PR.</p></div>
+        <div class="card"><h3>Shadow mode first</h3><p>New plays run on a holdout segment and go live only when they beat the control group.</p></div>
+        <div class="card"><h3>Tests and evals</h3><p>Unit tests on decision logic. Eval sets for every AI output: accuracy, tone, no invented facts.</p></div>
+        <div class="card"><h3>No duplicates</h3><p>A stable action ID is the upsert key, so a retried job never creates a second task or enrollment.</p></div>
+        <div class="card"><h3>Visible failures</h3><p>Enrichment misses, low AI confidence and API errors land in an exception queue with an owner.</p></div>
+        <div class="card"><h3>Logs and rollback</h3><p>Every run logs volume, coverage, cost and errors. Config snapshots allow a one-step rollback.</p></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="stack-v"><h2>Stack decisions</h2><p class="body">Hypotheses to test in the audit. Only Salesforce, Data Cloud, Agentforce and Slack are confirmed publicly.</p></div>
+      <div class="grid4">
+        <div class="card tool"><span class="chip accent">Keep and extend</span><h3>Record and agents</h3><ul><li>Salesforce Sales Cloud</li><li>Agentforce, fed with first-party signals</li><li>Data Cloud, Slack</li></ul></div>
+        <div class="card tool"><span class="chip violet">Standardize</span><h3>Build layer</h3><ul><li>Clay for enrichment and research</li><li>One orchestrator: n8n or Workato</li><li>Snowflake + dbt, reverse ETL</li></ul></div>
+        <div class="card tool"><span class="chip signal">Consolidate</span><h3>Data providers</h3><ul><li>Cost per verified contact by region</li><li>Re-order the waterfall quarterly</li><li>One vendor per signal type</li></ul></div>
+        <div class="card tool"><span class="chip crit">Retire</span><h3>Shadow tooling</h3><ul><li>Personal spreadsheets and scripts</li><li>Unowned sequencing seats</li><li>Automations without logs</li></ul></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="stack-v"><h2>Team</h2><p class="body">Small and senior, split across Europe and North America.</p></div>
+      <div class="grid4">
+        <div class="role"><b>Director, player-coach</b>Architecture, roadmap, Sales VP partnership. Builds in Clay and code every week.</div>
+        <div class="role"><b>GTM Engineer, EMEA</b>New-logo plays, enrichment and signal pipelines for Europe.</div>
+        <div class="role"><b>GTM Engineer, NA</b>US Spend launch plays and inbound speed-to-lead.</div>
+        <div class="role"><b>GTM Engineer, AM and data</b>Risk, whitespace and product data models in dbt.</div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+<footer><div class="wrap">Proposal by Massimo Mauri for the Director of GTM Engineering role at Perk. Prototype data is fictional, generated by the reference pipeline (config <span id="cfgv"></span>, run <span id="rund"></span>).</div></footer>
+
+<script id="runData" type="application/json">{"config_version":"2026.11.0","run_date":"2026-11-23","metrics":{"records_in":19,"contact_coverage_pct":100,"verified_email_pct":71,"credits_spent":60.0,"credits_per_verified_contact":6.0,"actions_created":17,"duplicates_skipped":0,"needs_human_review":2,"suppressed_signals":1,"exceptions":[],"manual_minutes_replaced":585,"by_play":{"signal_outbound_sdr":2,"ai_sdr_supervised":5,"no_action":1,"marketing_nurture":3,"deal_signal_to_ae":1,"hold_cooldown":1,"inbound_speed_to_lead":1,"am_cross_sell_spend":2,"am_save_play":2,"am_expansion_watch":1},"runtime_ms":1},"signals_catalog":{"new_finance_leader":{"label":"New CFO / VP Finance","strength":30,"half_life":90,"motion":"new_logo","source":"UserGems / job-change feed","owner":"GTM Eng","suppress_if":["open_opportunity"]},"hiring_travel_or_ap":{"label":"Hiring travel manager or AP clerk","strength":25,"half_life":45,"motion":"new_logo","source":"PredictLeads job postings","owner":"GTM Eng","suppress_if":["open_opportunity"]},"funding_round":{"label":"Raised a funding round","strength":20,"half_life":60,"motion":"new_logo","source":"Funding news feed","owner":"GTM Eng","suppress_if":[]},"new_office_or_country":{"label":"New office or country entry","strength":22,"half_life":120,"motion":"new_logo","source":"Claygent web research","owner":"GTM Eng","suppress_if":[]},"competitor_renewal_window":{"label":"Incumbent T&E contract renews < 6 months","strength":35,"half_life":60,"motion":"new_logo","source":"Tech-stack data + rep notes","owner":"RevOps","suppress_if":["open_opportunity"]},"intent_spend_mgmt":{"label":"Third-party intent: spend management","strength":15,"half_life":21,"motion":"new_logo","source":"Bombora / 6sense","owner":"Marketing Ops","suppress_if":[]},"pricing_page_visit":{"label":"Visited pricing page (known account)","strength":18,"half_life":7,"motion":"any","source":"Website reverse-IP","owner":"Marketing Ops","suppress_if":[]},"demo_request":{"label":"Requested a demo","strength":60,"half_life":3,"motion":"inbound","source":"Web form","owner":"Marketing Ops","suppress_if":[]},"travel_only_high_spend":{"label":"Travel customer, no Spend module, high T&E volume","strength":30,"half_life":180,"motion":"expansion","source":"Perk product data (Snowflake)","owner":"AM leadership","suppress_if":["open_opportunity"]},"headcount_growth":{"label":"Headcount +20% in 12 months","strength":15,"half_life":120,"motion":"expansion","source":"Enrichment","owner":"GTM Eng","suppress_if":[]},"bookings_drop":{"label":"Bookings down > 30% vs prior 90 days","strength":35,"half_life":45,"motion":"retention","source":"Perk product data (Snowflake)","owner":"AM leadership","suppress_if":[]},"champion_left":{"label":"Champion / admin left the company","strength":30,"half_life":60,"motion":"retention","source":"UserGems / job-change feed","owner":"AM leadership","suppress_if":[]},"support_escalations":{"label":"3+ support escalations in 30 days","strength":20,"half_life":30,"motion":"retention","source":"Zendesk","owner":"CX Ops","suppress_if":[]}},"plays":{"inbound_speed_to_lead":{"label":"Inbound speed-to-lead","owner":"AE (round-robin, region)","sla":"5 min","human_in_loop":false},"signal_outbound_sdr":{"label":"Signal-based outbound (human SDR)","owner":"SDR pod","sla":"24 h","human_in_loop":true},"ai_sdr_supervised":{"label":"AI SDR sequence, human-approved","owner":"AI SDR agent + SDR reviewer","sla":"48 h","human_in_loop":true},"deal_signal_to_ae":{"label":"Live-deal signal to AE owner","owner":"Opportunity owner (AE)","sla":"24 h","human_in_loop":false},"marketing_nurture":{"label":"Marketing nurture","owner":"Marketing automation","sla":"weekly","human_in_loop":false},"am_cross_sell_spend":{"label":"Cross-sell Spend to Travel customer","owner":"Account Manager","sla":"5 days","human_in_loop":true},"am_save_play":{"label":"Churn-risk save play","owner":"Account Manager + CSM","sla":"48 h","human_in_loop":true},"am_expansion_watch":{"label":"Expansion watch (seat growth)","owner":"Account Manager","sla":"next QBR","human_in_loop":false},"hold_cooldown":{"label":"Hold: contacted recently","owner":"None","sla":"-","human_in_loop":false},"no_action":{"label":"No action (low fit and no timing)","owner":"None","sla":"-","human_in_loop":false}},"decisions":[{"account":{"id":"ACC-001","name":"Northwind Consulting","domain":"northwind-consulting.example","country":"ES","region":"EMEA","industry":"Consulting","employees":420,"countries":4,"current_tool":"Excel + email","is_customer":false,"signals":[{"type":"new_finance_leader","days_ago":12,"evidence":"New CFO announced on LinkedIn, ex-Big Four"},{"type":"hiring_travel_or_ap","days_ago":9,"evidence":"Job post: 'Travel & Expense Coordinator', Madrid"}],"finance_contact":{"name":"Grace Bianchi","title":"CFO","email":"grace.bianchi@northwind-consulting.example","email_status":"valid"},"enrichment":{"sources":{"finance_contact":"provider_a"},"credits":1.5,"log":["finance_contact: hit on provider_a (+1 cr)","email verification: valid (+0.5 cr)"]}},"scores":{"fit_travel":83,"fit_spend":78,"fit":83,"timing":49,"priority":68,"tier":"P1","product_angle":"Travel + Spend bundle","active_signals":[{"type":"new_finance_leader","days_ago":12,"evidence":"New CFO announced on LinkedIn, ex-Big Four","label":"New CFO / VP Finance","source":"UserGems / job-change feed","weight":27.4,"strength":30},{"type":"hiring_travel_or_ap","days_ago":9,"evidence":"Job post: 'Travel & Expense Coordinator', Madrid","label":"Hiring travel manager or AP clerk","source":"PredictLeads job postings","weight":21.8,"strength":25}],"suppressed_signals":[]},"play":"signal_outbound_sdr","routing_notes":[],"action_id":"558231fb6ddf","brief":{"why_now":"New CFO / VP Finance (12d ago): New CFO announced on LinkedIn, ex-Big Four; Hiring travel manager or AP clerk (9d ago): Job post: 'Travel & Expense Coordinator', Madrid","angle":"Travel + Spend bundle: one policy layer and one data layer across trips, cards and expenses","opener":"Hi Grace, I noticed: New CFO announced on LinkedIn, ex-Big Four. Companies at Northwind Consulting's stage usually hit the point where travel and expenses outgrow Excel + email. Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.85,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"northwind-consulting.example"},"fields":{"GTM_Fit_Travel__c":83,"GTM_Fit_Spend__c":78,"GTM_Timing_Score__c":49,"GTM_Priority_Tier__c":"P1","GTM_Top_Signal__c":"New CFO / VP Finance","GTM_Play__c":"signal_outbound_sdr","GTM_Brief_Confidence__c":0.85,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P1] Signal-based outbound (human SDR)","Owner":"SDR pod","External_Id__c":"558231fb6ddf"}},"play_meta":{"label":"Signal-based outbound (human SDR)","owner":"SDR pod","sla":"24 h","human_in_loop":true}},{"account":{"id":"ACC-002","name":"Brightwave Engineering","domain":"brightwave-eng.example","country":"DE","region":"EMEA","industry":"Engineering","employees":1150,"countries":6,"current_tool":"SAP Concur","is_customer":false,"signals":[{"type":"competitor_renewal_window","days_ago":20,"evidence":"Concur contract renews March 2027 (rep note)"},{"type":"pricing_page_visit","days_ago":2,"evidence":"3 visits to /pricing from Munich IP range"}],"finance_contact":{"name":"Lucia Haugen","title":"CFO","email":"lucia.haugen@brightwave-eng.example","email_status":"catch_all"},"enrichment":{"sources":{"employees":"provider_a","finance_contact":"provider_b"},"credits":5.5,"log":["employees: hit on provider_a (+1 cr)","finance_contact: miss on provider_a (+1 cr)","finance_contact: hit on provider_b (+3 cr)","email verification: catch_all (+0.5 cr)"]}},"scores":{"fit_travel":82,"fit_spend":75,"fit":82,"timing":43,"priority":64,"tier":"P1","product_angle":"Travel + Spend bundle","active_signals":[{"type":"competitor_renewal_window","days_ago":20,"evidence":"Concur contract renews March 2027 (rep note)","label":"Incumbent T&E contract renews < 6 months","source":"Tech-stack data + rep notes","weight":27.8,"strength":35},{"type":"pricing_page_visit","days_ago":2,"evidence":"3 visits to /pricing from Munich IP range","label":"Visited pricing page (known account)","source":"Website reverse-IP","weight":14.8,"strength":18}],"suppressed_signals":[]},"play":"ai_sdr_supervised","routing_notes":["SDR pod EMEA at capacity -> overflow to supervised AI SDR"],"action_id":"c2ff9b70ceaf","brief":{"why_now":"Incumbent T&E contract renews < 6 months (20d ago): Concur contract renews March 2027 (rep note); Visited pricing page (known account) (2d ago): 3 visits to /pricing from Munich IP range","angle":"Travel + Spend bundle: one policy layer and one data layer across trips, cards and expenses","opener":"Hi Lucia, I noticed: Concur contract renews March 2027 (rep note). Companies at Brightwave Engineering's stage usually hit the point where travel and expenses outgrow SAP Concur. Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.7,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"brightwave-eng.example"},"fields":{"GTM_Fit_Travel__c":82,"GTM_Fit_Spend__c":75,"GTM_Timing_Score__c":43,"GTM_Priority_Tier__c":"P1","GTM_Top_Signal__c":"Incumbent T&E contract renews < 6 months","GTM_Play__c":"ai_sdr_supervised","GTM_Brief_Confidence__c":0.7,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P1] AI SDR sequence, human-approved","Owner":"AI SDR agent + SDR reviewer","External_Id__c":"c2ff9b70ceaf"}},"play_meta":{"label":"AI SDR sequence, human-approved","owner":"AI SDR agent + SDR reviewer","sla":"48 h","human_in_loop":true}},{"account":{"id":"ACC-003","name":"Lumen Biotech","domain":"lumen-bio.example","country":"NL","region":"EMEA","industry":"Pharma","employees":1300,"countries":8,"current_tool":"Expensify","is_customer":false,"signals":[{"type":"funding_round","days_ago":25,"evidence":"Series C, EUR 80M"},{"type":"new_office_or_country","days_ago":30,"evidence":"Opening Boston office Q1 2027"}],"finance_contact":{"name":"Mei Martin","title":"VP Finance","email":"mei.martin@lumen-bio.example","email_status":"valid"},"enrichment":{"sources":{"finance_contact":"provider_b"},"credits":4.5,"log":["finance_contact: miss on provider_a (+1 cr)","finance_contact: hit on provider_b (+3 cr)","email verification: valid (+0.5 cr)"]}},"scores":{"fit_travel":82,"fit_spend":75,"fit":82,"timing":33,"priority":60,"tier":"P2","product_angle":"Travel + Spend bundle","active_signals":[{"type":"new_office_or_country","days_ago":30,"evidence":"Opening Boston office Q1 2027","label":"New office or country entry","source":"Claygent web research","weight":18.5,"strength":22},{"type":"funding_round","days_ago":25,"evidence":"Series C, EUR 80M","label":"Raised a funding round","source":"Funding news feed","weight":15.0,"strength":20}],"suppressed_signals":[]},"play":"ai_sdr_supervised","routing_notes":[],"action_id":"b49d7dddeaf3","brief":{"why_now":"New office or country entry (30d ago): Opening Boston office Q1 2027; Raised a funding round (25d ago): Series C, EUR 80M","angle":"Travel + Spend bundle: one policy layer and one data layer across trips, cards and expenses","opener":"Hi Mei, I noticed: Opening Boston office Q1 2027. Companies at Lumen Biotech's stage usually hit the point where travel and expenses outgrow Expensify. Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.85,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"lumen-bio.example"},"fields":{"GTM_Fit_Travel__c":82,"GTM_Fit_Spend__c":75,"GTM_Timing_Score__c":33,"GTM_Priority_Tier__c":"P2","GTM_Top_Signal__c":"New office or country entry","GTM_Play__c":"ai_sdr_supervised","GTM_Brief_Confidence__c":0.85,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P2] AI SDR sequence, human-approved","Owner":"AI SDR agent + SDR reviewer","External_Id__c":"b49d7dddeaf3"}},"play_meta":{"label":"AI SDR sequence, human-approved","owner":"AI SDR agent + SDR reviewer","sla":"48 h","human_in_loop":true}},{"account":{"id":"ACC-004","name":"Cobalt Retail Group","domain":"cobalt-retail.example","country":"FR","region":"EMEA","industry":"Retail","employees":6500,"countries":2,"current_tool":"SAP Concur","is_customer":false,"signals":[{"type":"intent_spend_mgmt","days_ago":6,"evidence":"Surging on 'corporate card' topic cluster"}],"finance_contact":{"name":"Hannah Haugen","title":"VP Finance","email":"hannah.haugen@cobalt-retail.example","email_status":"valid"},"enrichment":{"sources":{"finance_contact":"provider_b"},"credits":4.5,"log":["finance_contact: miss on provider_a (+1 cr)","finance_contact: hit on provider_b (+3 cr)","email verification: valid (+0.5 cr)"]}},"scores":{"fit_travel":22,"fit_spend":30,"fit":30,"timing":12,"priority":22,"tier":"P4","product_angle":"Spend-led","active_signals":[{"type":"intent_spend_mgmt","days_ago":6,"evidence":"Surging on 'corporate card' topic cluster","label":"Third-party intent: spend management","source":"Bombora / 6sense","weight":12.3,"strength":15}],"suppressed_signals":[]},"play":"no_action","routing_notes":[],"action_id":"cd22bbffbb4d","brief":{"why_now":"Third-party intent: spend management (6d ago): Surging on 'corporate card' topic cluster","angle":"Spend-led: finance teams close expenses with 90% of reports processed with zero human touch","opener":"Hi Hannah, I noticed: Surging on 'corporate card' topic cluster. Companies at Cobalt Retail Group's stage usually hit the point where travel and expenses outgrow SAP Concur. Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.75,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"cobalt-retail.example"},"fields":{"GTM_Fit_Travel__c":22,"GTM_Fit_Spend__c":30,"GTM_Timing_Score__c":12,"GTM_Priority_Tier__c":"P4","GTM_Top_Signal__c":"Third-party intent: spend management","GTM_Play__c":"no_action","GTM_Brief_Confidence__c":0.75,"GTM_Config_Version__c":"2026.11.0"},"task":null},"play_meta":{"label":"No action (low fit and no timing)","owner":"None","sla":"-","human_in_loop":false}},{"account":{"id":"ACC-005","name":"Atlas Field Services","domain":"atlas-field.example","country":"UK","region":"EMEA","industry":"Construction","employees":850,"countries":3,"current_tool":"None (paper receipts)","is_customer":false,"signals":[{"type":"hiring_travel_or_ap","days_ago":15,"evidence":"Hiring 2 AP clerks, Manchester"},{"type":"intent_spend_mgmt","days_ago":4,"evidence":"Surging on 'expense automation'"},{"type":"pricing_page_visit","days_ago":3,"evidence":"Pricing + integrations pages, 2 visitors"}],"finance_contact":{"name":"Grace Bianchi","title":"VP Finance","email":"grace.bianchi@atlas-field.example","email_status":"valid"},"enrichment":{"sources":{"finance_contact":"provider_b"},"credits":4.5,"log":["finance_contact: miss on provider_a (+1 cr)","finance_contact: hit on provider_b (+3 cr)","email verification: valid (+0.5 cr)"]}},"scores":{"fit_travel":83,"fit_spend":78,"fit":83,"timing":46,"priority":66,"tier":"P1","product_angle":"Travel + Spend bundle","active_signals":[{"type":"hiring_travel_or_ap","days_ago":15,"evidence":"Hiring 2 AP clerks, Manchester","label":"Hiring travel manager or AP clerk","source":"PredictLeads job postings","weight":19.8,"strength":25},{"type":"pricing_page_visit","days_ago":3,"evidence":"Pricing + integrations pages, 2 visitors","label":"Visited pricing page (known account)","source":"Website reverse-IP","weight":13.4,"strength":18},{"type":"intent_spend_mgmt","days_ago":4,"evidence":"Surging on 'expense automation'","label":"Third-party intent: spend management","source":"Bombora / 6sense","weight":13.1,"strength":15}],"suppressed_signals":[]},"play":"signal_outbound_sdr","routing_notes":[],"action_id":"e5a0dc0aa4c7","brief":{"why_now":"Hiring travel manager or AP clerk (15d ago): Hiring 2 AP clerks, Manchester; Visited pricing page (known account) (3d ago): Pricing + integrations pages, 2 visitors","angle":"Travel + Spend bundle: one policy layer and one data layer across trips, cards and expenses","opener":"Hi Grace, I noticed: Hiring 2 AP clerks, Manchester. Companies at Atlas Field Services's stage usually hit the point where travel and expenses outgrow None (paper receipts). Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.9,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"atlas-field.example"},"fields":{"GTM_Fit_Travel__c":83,"GTM_Fit_Spend__c":78,"GTM_Timing_Score__c":46,"GTM_Priority_Tier__c":"P1","GTM_Top_Signal__c":"Hiring travel manager or AP clerk","GTM_Play__c":"signal_outbound_sdr","GTM_Brief_Confidence__c":0.9,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P1] Signal-based outbound (human SDR)","Owner":"SDR pod","External_Id__c":"e5a0dc0aa4c7"}},"play_meta":{"label":"Signal-based outbound (human SDR)","owner":"SDR pod","sla":"24 h","human_in_loop":true}},{"account":{"id":"ACC-006","name":"Quillon Media","domain":"quillon-media.example","country":"IT","region":"EMEA","industry":"Media & Events","employees":380,"countries":5,"current_tool":"TravelPerk competitor (Navan)","is_customer":false,"signals":[{"type":"new_finance_leader","days_ago":70,"evidence":"New VP Finance, 10 weeks ago"}],"finance_contact":{"name":"Mei Hughes","title":"VP Finance","email":"mei.hughes@quillon-media.example","email_status":"valid"},"enrichment":{"sources":{"employees":"provider_a","finance_contact":"provider_a"},"credits":2.5,"log":["employees: hit on provider_a (+1 cr)","finance_contact: hit on provider_a (+1 cr)","email verification: valid (+0.5 cr)"]}},"scores":{"fit_travel":74,"fit_spend":55,"fit":74,"timing":17,"priority":48,"tier":"P3","product_angle":"Travel-led","active_signals":[{"type":"new_finance_leader","days_ago":70,"evidence":"New VP Finance, 10 weeks ago","label":"New CFO / VP Finance","source":"UserGems / job-change feed","weight":17.5,"strength":30}],"suppressed_signals":[]},"play":"marketing_nurture","routing_notes":[],"action_id":"fa7a5cc3654b","brief":{"why_now":"New CFO / VP Finance (70d ago): New VP Finance, 10 weeks ago","angle":"Travel-led: teams like yours cut booking time and keep every trip in policy without chasing approvals","opener":"Hi Mei, I noticed: New VP Finance, 10 weeks ago. Companies at Quillon Media's stage usually hit the point where travel and expenses outgrow TravelPerk competitor (Navan). Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.75,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"quillon-media.example"},"fields":{"GTM_Fit_Travel__c":74,"GTM_Fit_Spend__c":55,"GTM_Timing_Score__c":17,"GTM_Priority_Tier__c":"P3","GTM_Top_Signal__c":"New CFO / VP Finance","GTM_Play__c":"marketing_nurture","GTM_Brief_Confidence__c":0.75,"GTM_Config_Version__c":"2026.11.0"},"task":null},"play_meta":{"label":"Marketing nurture","owner":"Marketing automation","sla":"weekly","human_in_loop":false}},{"account":{"id":"ACC-007","name":"Helios Energy Partners","domain":"helios-energy.example","country":"ES","region":"EMEA","industry":"Energy","employees":2100,"countries":7,"current_tool":"Excel + email","is_customer":false,"open_opportunity":true,"signals":[{"type":"new_finance_leader","days_ago":5,"evidence":"New CFO"},{"type":"pricing_page_visit","days_ago":1,"evidence":"Pricing page, 4 visits"}],"finance_contact":{"name":"Tomas Hughes","title":"Head of Finance Operations","email":"tomas.hughes@helios-energy.example","email_status":"valid"},"enrichment":{"sources":{"finance_contact":"provider_b"},"credits":4.5,"log":["finance_contact: miss on provider_a (+1 cr)","finance_contact: hit on provider_b (+3 cr)","email verification: valid (+0.5 cr)"]}},"scores":{"fit_travel":82,"fit_spend":77,"fit":82,"timing":16,"priority":52,"tier":"P3","product_angle":"Travel + Spend bundle","active_signals":[{"type":"pricing_page_visit","days_ago":1,"evidence":"Pricing page, 4 visits","label":"Visited pricing page (known account)","source":"Website reverse-IP","weight":16.3,"strength":18}],"suppressed_signals":[{"type":"new_finance_leader","days_ago":5,"evidence":"New CFO","reason":"open opportunity already exists"}]},"play":"deal_signal_to_ae","routing_notes":[],"action_id":"1e30f962e4b8","brief":{"why_now":"Visited pricing page (known account) (1d ago): Pricing page, 4 visits","angle":"Travel + Spend bundle: one policy layer and one data layer across trips, cards and expenses","opener":"Hi Tomas, I noticed: Pricing page, 4 visits. Companies at Helios Energy Partners's stage usually hit the point where travel and expenses outgrow Excel + email. Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.75,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"helios-energy.example"},"fields":{"GTM_Fit_Travel__c":82,"GTM_Fit_Spend__c":77,"GTM_Timing_Score__c":16,"GTM_Priority_Tier__c":"P3","GTM_Top_Signal__c":"Visited pricing page (known account)","GTM_Play__c":"deal_signal_to_ae","GTM_Brief_Confidence__c":0.75,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P3] Live-deal signal to AE owner","Owner":"Opportunity owner (AE)","External_Id__c":"1e30f962e4b8"}},"play_meta":{"label":"Live-deal signal to AE owner","owner":"Opportunity owner (AE)","sla":"24 h","human_in_loop":false}},{"account":{"id":"ACC-008","name":"Pinecrest Software","domain":"pinecrest.example","country":"SE","region":"EMEA","industry":"Software","employees":260,"countries":3,"current_tool":"Expensify","is_customer":false,"last_contacted_days":6,"signals":[{"type":"funding_round","days_ago":10,"evidence":"Series B, USD 40M"}],"finance_contact":{"name":"Jonas Bianchi","title":"Controller","email":"jonas.bianchi@pinecrest.example","email_status":"catch_all"},"enrichment":{"sources":{"finance_contact":"provider_b"},"credits":4.5,"log":["finance_contact: miss on provider_a (+1 cr)","finance_contact: hit on provider_b (+3 cr)","email verification: catch_all (+0.5 cr)"]}},"scores":{"fit_travel":75,"fit_spend":68,"fit":75,"timing":18,"priority":49,"tier":"P3","product_angle":"Travel + Spend bundle","active_signals":[{"type":"funding_round","days_ago":10,"evidence":"Series B, USD 40M","label":"Raised a funding round","source":"Funding news feed","weight":17.8,"strength":20}],"suppressed_signals":[]},"play":"hold_cooldown","routing_notes":[],"action_id":"dc42ee43e7f0","brief":{"why_now":"Raised a funding round (10d ago): Series B, USD 40M","angle":"Travel + Spend bundle: one policy layer and one data layer across trips, cards and expenses","opener":"Hi Jonas, I noticed: Series B, USD 40M. Companies at Pinecrest Software's stage usually hit the point where travel and expenses outgrow Expensify. Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.6,"needs_review":true},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"pinecrest.example"},"fields":{"GTM_Fit_Travel__c":75,"GTM_Fit_Spend__c":68,"GTM_Timing_Score__c":18,"GTM_Priority_Tier__c":"P3","GTM_Top_Signal__c":"Raised a funding round","GTM_Play__c":"hold_cooldown","GTM_Brief_Confidence__c":0.6,"GTM_Config_Version__c":"2026.11.0"},"task":null},"play_meta":{"label":"Hold: contacted recently","owner":"None","sla":"-","human_in_loop":false}},{"account":{"id":"ACC-009","name":"Redline Logistics","domain":"redline-logistics.example","country":"US","region":"NA","industry":"Logistics","employees":1600,"countries":2,"current_tool":"SAP Concur","is_customer":false,"signals":[{"type":"competitor_renewal_window","days_ago":35,"evidence":"Concur renewal June 2027"},{"type":"new_office_or_country","days_ago":40,"evidence":"New hub in Toronto"}],"finance_contact":{"name":"Amara Becker","title":"VP Finance","email":"amara.becker@redline-logistics.example","email_status":"catch_all"},"enrichment":{"sources":{"finance_contact":"provider_c"},"credits":10.5,"log":["finance_contact: miss on provider_a (+1 cr)","finance_contact: miss on provider_b (+3 cr)","finance_contact: hit on provider_c (+6 cr)","email verification: catch_all (+0.5 cr)"]}},"scores":{"fit_travel":59,"fit_spend":52,"fit":59,"timing":41,"priority":51,"tier":"P2","product_angle":"Travel-led","active_signals":[{"type":"competitor_renewal_window","days_ago":35,"evidence":"Concur renewal June 2027","label":"Incumbent T&E contract renews < 6 months","source":"Tech-stack data + rep notes","weight":23.4,"strength":35},{"type":"new_office_or_country","days_ago":40,"evidence":"New hub in Toronto","label":"New office or country entry","source":"Claygent web research","weight":17.5,"strength":22}],"suppressed_signals":[]},"play":"ai_sdr_supervised","routing_notes":[],"action_id":"2269d07149d9","brief":{"why_now":"Incumbent T&E contract renews < 6 months (35d ago): Concur renewal June 2027; New office or country entry (40d ago): New hub in Toronto","angle":"Travel-led: teams like yours cut booking time and keep every trip in policy without chasing approvals","opener":"Hi Amara, I noticed: Concur renewal June 2027. Companies at Redline Logistics's stage usually hit the point where travel and expenses outgrow SAP Concur. Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.7,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"redline-logistics.example"},"fields":{"GTM_Fit_Travel__c":59,"GTM_Fit_Spend__c":52,"GTM_Timing_Score__c":41,"GTM_Priority_Tier__c":"P2","GTM_Top_Signal__c":"Incumbent T&E contract renews < 6 months","GTM_Play__c":"ai_sdr_supervised","GTM_Brief_Confidence__c":0.7,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P2] AI SDR sequence, human-approved","Owner":"AI SDR agent + SDR reviewer","External_Id__c":"2269d07149d9"}},"play_meta":{"label":"AI SDR sequence, human-approved","owner":"AI SDR agent + SDR reviewer","sla":"48 h","human_in_loop":true}},{"account":{"id":"ACC-010","name":"Summit Health Analytics","domain":"summit-health.example","country":"US","region":"NA","industry":"Software","employees":950,"countries":1,"current_tool":"Ramp (cards only)","is_customer":false,"signals":[{"type":"hiring_travel_or_ap","days_ago":3,"evidence":"Job post: 'Corporate Travel Manager'"},{"type":"funding_round","days_ago":18,"evidence":"Series D, USD 120M"}],"finance_contact":{"name":"Elena Navarro","title":"Finance Director","email":"elena.navarro@summit-health.example","email_status":"valid"},"enrichment":{"sources":{"employees":"provider_a","finance_contact":"provider_a"},"credits":2.5,"log":["employees: hit on provider_a (+1 cr)","finance_contact: hit on provider_a (+1 cr)","email verification: valid (+0.5 cr)"]}},"scores":{"fit_travel":55,"fit_spend":44,"fit":55,"timing":40,"priority":48,"tier":"P2","product_angle":"Travel-led","active_signals":[{"type":"hiring_travel_or_ap","days_ago":3,"evidence":"Job post: 'Corporate Travel Manager'","label":"Hiring travel manager or AP clerk","source":"PredictLeads job postings","weight":23.9,"strength":25},{"type":"funding_round","days_ago":18,"evidence":"Series D, USD 120M","label":"Raised a funding round","source":"Funding news feed","weight":16.2,"strength":20}],"suppressed_signals":[]},"play":"ai_sdr_supervised","routing_notes":[],"action_id":"f113ff810aba","brief":{"why_now":"Hiring travel manager or AP clerk (3d ago): Job post: 'Corporate Travel Manager'; Raised a funding round (18d ago): Series D, USD 120M","angle":"Travel-led: teams like yours cut booking time and keep every trip in policy without chasing approvals","opener":"Hi Elena, I noticed: Job post: 'Corporate Travel Manager'. Companies at Summit Health Analytics's stage usually hit the point where travel and expenses outgrow Ramp (cards only). Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.85,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"summit-health.example"},"fields":{"GTM_Fit_Travel__c":55,"GTM_Fit_Spend__c":44,"GTM_Timing_Score__c":40,"GTM_Priority_Tier__c":"P2","GTM_Top_Signal__c":"Hiring travel manager or AP clerk","GTM_Play__c":"ai_sdr_supervised","GTM_Brief_Confidence__c":0.85,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P2] AI SDR sequence, human-approved","Owner":"AI SDR agent + SDR reviewer","External_Id__c":"f113ff810aba"}},"play_meta":{"label":"AI SDR sequence, human-approved","owner":"AI SDR agent + SDR reviewer","sla":"48 h","human_in_loop":true}},{"account":{"id":"ACC-011","name":"Granite & Co Builders","domain":"granite-builders.example","country":"US","region":"NA","industry":"Construction","employees":3200,"countries":1,"current_tool":"None (paper receipts)","is_customer":false,"signals":[{"type":"intent_spend_mgmt","days_ago":30,"evidence":"Intent faded, last surge a month ago"}],"finance_contact":{"name":"Ines Moreau","title":"Head of Finance Operations","email":"ines.moreau@granite-builders.example","email_status":"valid"},"enrichment":{"sources":{"finance_contact":"provider_a"},"credits":1.5,"log":["finance_contact: hit on provider_a (+1 cr)","email verification: valid (+0.5 cr)"]}},"scores":{"fit_travel":55,"fit_spend":50,"fit":55,"timing":6,"priority":33,"tier":"P3","product_angle":"Travel-led","active_signals":[{"type":"intent_spend_mgmt","days_ago":30,"evidence":"Intent faded, last surge a month ago","label":"Third-party intent: spend management","source":"Bombora / 6sense","weight":5.6,"strength":15}],"suppressed_signals":[]},"play":"marketing_nurture","routing_notes":[],"action_id":"1b63a50508da","brief":{"why_now":"Third-party intent: spend management (30d ago): Intent faded, last surge a month ago","angle":"Travel-led: teams like yours cut booking time and keep every trip in policy without chasing approvals","opener":"Hi Ines, I noticed: Intent faded, last surge a month ago. Companies at Granite & Co Builders's stage usually hit the point where travel and expenses outgrow None (paper receipts). Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.75,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"granite-builders.example"},"fields":{"GTM_Fit_Travel__c":55,"GTM_Fit_Spend__c":50,"GTM_Timing_Score__c":6,"GTM_Priority_Tier__c":"P3","GTM_Top_Signal__c":"Third-party intent: spend management","GTM_Play__c":"marketing_nurture","GTM_Brief_Confidence__c":0.75,"GTM_Config_Version__c":"2026.11.0"},"task":null},"play_meta":{"label":"Marketing nurture","owner":"Marketing automation","sla":"weekly","human_in_loop":false}},{"account":{"id":"ACC-012","name":"Vantage Clinical","domain":"vantage-clinical.example","country":"US","region":"NA","industry":"Pharma","employees":700,"countries":4,"current_tool":"Excel + email","is_customer":false,"signals":[{"type":"new_finance_leader","days_ago":20,"evidence":"New VP Finance from a Perk customer"}],"finance_contact":{"name":"Elena Haugen","title":"VP Finance","email":"elena.haugen@vantage-clinical.example","email_status":"valid"},"enrichment":{"sources":{"finance_contact":"provider_a"},"credits":1.5,"log":["finance_contact: hit on provider_a (+1 cr)","email verification: valid (+0.5 cr)"]}},"scores":{"fit_travel":83,"fit_spend":78,"fit":83,"timing":26,"priority":57,"tier":"P2","product_angle":"Travel + Spend bundle","active_signals":[{"type":"new_finance_leader","days_ago":20,"evidence":"New VP Finance from a Perk customer","label":"New CFO / VP Finance","source":"UserGems / job-change feed","weight":25.7,"strength":30}],"suppressed_signals":[]},"play":"ai_sdr_supervised","routing_notes":[],"action_id":"733ebc36d2ca","brief":{"why_now":"New CFO / VP Finance (20d ago): New VP Finance from a Perk customer","angle":"Travel + Spend bundle: one policy layer and one data layer across trips, cards and expenses","opener":"Hi Elena, I noticed: New VP Finance from a Perk customer. Companies at Vantage Clinical's stage usually hit the point where travel and expenses outgrow Excel + email. Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.75,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"vantage-clinical.example"},"fields":{"GTM_Fit_Travel__c":83,"GTM_Fit_Spend__c":78,"GTM_Timing_Score__c":26,"GTM_Priority_Tier__c":"P2","GTM_Top_Signal__c":"New CFO / VP Finance","GTM_Play__c":"ai_sdr_supervised","GTM_Brief_Confidence__c":0.75,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P2] AI SDR sequence, human-approved","Owner":"AI SDR agent + SDR reviewer","External_Id__c":"733ebc36d2ca"}},"play_meta":{"label":"AI SDR sequence, human-approved","owner":"AI SDR agent + SDR reviewer","sla":"48 h","human_in_loop":true}},{"account":{"id":"ACC-013","name":"Bluebird Cafes","domain":"bluebird-cafes.example","country":"US","region":"NA","industry":"Hospitality","employees":90,"countries":1,"current_tool":"None","is_customer":false,"signals":[{"type":"funding_round","days_ago":50,"evidence":"Seed round"}],"finance_contact":{"name":"Pieter Navarro","title":"Head of Finance Operations","email":"pieter.navarro@bluebird-cafes.example","email_status":"invalid"},"enrichment":{"sources":{"finance_contact":"provider_c"},"credits":10.5,"log":["finance_contact: miss on provider_a (+1 cr)","finance_contact: miss on provider_b (+3 cr)","finance_contact: hit on provider_c (+6 cr)","email verification: invalid (+0.5 cr)"]}},"scores":{"fit_travel":30,"fit_spend":40,"fit":40,"timing":11,"priority":27,"tier":"P3","product_angle":"Spend-led","active_signals":[{"type":"funding_round","days_ago":50,"evidence":"Seed round","label":"Raised a funding round","source":"Funding news feed","weight":11.2,"strength":20}],"suppressed_signals":[]},"play":"marketing_nurture","routing_notes":[],"action_id":"60622380493f","brief":{"why_now":"Raised a funding round (50d ago): Seed round","angle":"Spend-led: finance teams close expenses with 90% of reports processed with zero human touch","opener":"Hi Pieter, I noticed: Seed round. Companies at Bluebird Cafes's stage usually hit the point where travel and expenses outgrow None. Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.45,"needs_review":true},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"bluebird-cafes.example"},"fields":{"GTM_Fit_Travel__c":30,"GTM_Fit_Spend__c":40,"GTM_Timing_Score__c":11,"GTM_Priority_Tier__c":"P3","GTM_Top_Signal__c":"Raised a funding round","GTM_Play__c":"marketing_nurture","GTM_Brief_Confidence__c":0.45,"GTM_Config_Version__c":"2026.11.0"},"task":null},"play_meta":{"label":"Marketing nurture","owner":"Marketing automation","sla":"weekly","human_in_loop":false}},{"account":{"id":"ACC-014","name":"Orbit Data Systems","domain":"orbit-data.example","country":"CA","region":"NA","industry":"Software","employees":540,"countries":3,"current_tool":"Expensify","is_customer":false,"signals":[{"type":"demo_request","days_ago":0,"evidence":"Demo form: 'Need travel + expenses in one tool, 3 offices'"}],"finance_contact":{"name":"Jonas Okafor","title":"Head of Finance Operations","email":"jonas.okafor@orbit-data.example","email_status":"valid"},"enrichment":{"sources":{"finance_contact":"provider_a"},"credits":1.5,"log":["finance_contact: hit on provider_a (+1 cr)","email verification: valid (+0.5 cr)"]}},"scores":{"fit_travel":75,"fit_spend":68,"fit":75,"timing":60,"priority":68,"tier":"P1","product_angle":"Travel + Spend bundle","active_signals":[{"type":"demo_request","days_ago":0,"evidence":"Demo form: 'Need travel + expenses in one tool, 3 offices'","label":"Requested a demo","source":"Web form","weight":60.0,"strength":60}],"suppressed_signals":[]},"play":"inbound_speed_to_lead","routing_notes":[],"action_id":"6542a089a219","brief":{"why_now":"Requested a demo (0d ago): Demo form: 'Need travel + expenses in one tool, 3 offices'","angle":"Travel + Spend bundle: one policy layer and one data layer across trips, cards and expenses","opener":"Hi Jonas, I noticed: Demo form: 'Need travel + expenses in one tool, 3 offices'. Companies at Orbit Data Systems's stage usually hit the point where travel and expenses outgrow Expensify. Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.75,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"orbit-data.example"},"fields":{"GTM_Fit_Travel__c":75,"GTM_Fit_Spend__c":68,"GTM_Timing_Score__c":60,"GTM_Priority_Tier__c":"P1","GTM_Top_Signal__c":"Requested a demo","GTM_Play__c":"inbound_speed_to_lead","GTM_Brief_Confidence__c":0.75,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P1] Inbound speed-to-lead","Owner":"AE (round-robin, region)","External_Id__c":"6542a089a219"}},"play_meta":{"label":"Inbound speed-to-lead","owner":"AE (round-robin, region)","sla":"5 min","human_in_loop":false}},{"account":{"id":"CUS-101","name":"Marlowe Architects","domain":"marlowe-arch.example","country":"UK","region":"EMEA","industry":"Engineering","employees":600,"countries":4,"current_tool":"Perk Travel","is_customer":true,"products":["Travel"],"arr_eur":48000,"annual_travel_spend_eur":1900000,"signals":[{"type":"travel_only_high_spend","days_ago":10,"evidence":"1.9M EUR annual travel through Perk, expenses still in Excel"},{"type":"headcount_growth","days_ago":40,"evidence":"+28% headcount in 12 months"}],"enrichment":{"sources":{},"credits":0.0,"log":[]}},"scores":{"fit_travel":63,"fit_spend":48,"fit":63,"timing":41,"priority":53,"tier":"P2","product_angle":"Travel-led","active_signals":[{"type":"travel_only_high_spend","days_ago":10,"evidence":"1.9M EUR annual travel through Perk, expenses still in Excel","label":"Travel customer, no Spend module, high T&E volume","source":"Perk product data (Snowflake)","weight":28.9,"strength":30},{"type":"headcount_growth","days_ago":40,"evidence":"+28% headcount in 12 months","label":"Headcount +20% in 12 months","source":"Enrichment","weight":11.9,"strength":15}],"suppressed_signals":[]},"play":"am_cross_sell_spend","routing_notes":[],"action_id":"b95ad81266a2","brief":{"why_now":"Travel customer, no Spend module, high T&E volume (10d ago): 1.9M EUR annual travel through Perk, expenses still in Excel; Headcount +20% in 12 months (40d ago): +28% headcount in 12 months","angle":"Bring expenses onto the same platform their travel already runs on","opener":"Marlowe Architects already books ~EUR 1,900,000 of travel on Perk; the receipts, per diems and card spend behind those trips are still handled elsewhere.","discovery_questions":["How do you reconcile travel invoices with expenses today?","How many hours a month does finance spend on expense reports?","When does your current expense tool renew?"],"next_step":"AM sends a 1-page ROI estimate built from their own Perk booking data","engine":"template","confidence":0.85,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"marlowe-arch.example"},"fields":{"GTM_Fit_Travel__c":63,"GTM_Fit_Spend__c":48,"GTM_Timing_Score__c":41,"GTM_Priority_Tier__c":"P2","GTM_Top_Signal__c":"Travel customer, no Spend module, high T&E volume","GTM_Play__c":"am_cross_sell_spend","GTM_Brief_Confidence__c":0.85,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P2] Cross-sell Spend to Travel customer","Owner":"Account Manager","External_Id__c":"b95ad81266a2"}},"play_meta":{"label":"Cross-sell Spend to Travel customer","owner":"Account Manager","sla":"5 days","human_in_loop":true}},{"account":{"id":"CUS-102","name":"Fjord Analytics","domain":"fjord-analytics.example","country":"NO","region":"EMEA","industry":"Software","employees":310,"countries":3,"current_tool":"Perk Travel + Spend","is_customer":true,"products":["Travel","Spend"],"arr_eur":36000,"annual_travel_spend_eur":700000,"signals":[{"type":"bookings_drop","days_ago":8,"evidence":"Bookings -41% vs prior 90 days"},{"type":"champion_left","days_ago":15,"evidence":"Travel admin left; no replacement in Perk admin list"}],"enrichment":{"sources":{},"credits":0.0,"log":[]}},"scores":{"fit_travel":63,"fit_spend":48,"fit":63,"timing":56,"priority":60,"tier":"P2","product_angle":"Travel-led","active_signals":[{"type":"bookings_drop","days_ago":8,"evidence":"Bookings -41% vs prior 90 days","label":"Bookings down > 30% vs prior 90 days","source":"Perk product data (Snowflake)","weight":30.9,"strength":35},{"type":"champion_left","days_ago":15,"evidence":"Travel admin left; no replacement in Perk admin list","label":"Champion / admin left the company","source":"UserGems / job-change feed","weight":25.2,"strength":30}],"suppressed_signals":[]},"play":"am_save_play","routing_notes":[],"action_id":"cbc6485a6ae1","brief":{"why_now":"Bookings down > 30% vs prior 90 days (8d ago): Bookings -41% vs prior 90 days; Champion / admin left the company (15d ago): Travel admin left; no replacement in Perk admin list","angle":"Retention risk: re-establish an owner and show value delivered","opener":"Book a value review with Fjord Analytics: savings, policy compliance and hours saved this year.","discovery_questions":["Who now owns travel admin after the change?","What changed in your travel volume this quarter?","Which reconciliation issues are still open?"],"next_step":"AM + CSM call within 48h; CSM fixes open escalations first","engine":"template","confidence":0.85,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"fjord-analytics.example"},"fields":{"GTM_Fit_Travel__c":63,"GTM_Fit_Spend__c":48,"GTM_Timing_Score__c":56,"GTM_Priority_Tier__c":"P2","GTM_Top_Signal__c":"Bookings down > 30% vs prior 90 days","GTM_Play__c":"am_save_play","GTM_Brief_Confidence__c":0.85,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P2] Churn-risk save play","Owner":"Account Manager + CSM","External_Id__c":"cbc6485a6ae1"}},"play_meta":{"label":"Churn-risk save play","owner":"Account Manager + CSM","sla":"48 h","human_in_loop":true}},{"account":{"id":"CUS-103","name":"Keystone Pharma","domain":"keystone-pharma.example","country":"US","region":"NA","industry":"Pharma","employees":2400,"countries":6,"current_tool":"Perk Travel","is_customer":true,"products":["Travel"],"arr_eur":150000,"annual_travel_spend_eur":6500000,"signals":[{"type":"travel_only_high_spend","days_ago":5,"evidence":"6.5M EUR travel, expense tool is SAP Concur Expense"}],"enrichment":{"sources":{},"credits":0.0,"log":[]}},"scores":{"fit_travel":62,"fit_spend":47,"fit":62,"timing":29,"priority":47,"tier":"P2","product_angle":"Travel-led","active_signals":[{"type":"travel_only_high_spend","days_ago":5,"evidence":"6.5M EUR travel, expense tool is SAP Concur Expense","label":"Travel customer, no Spend module, high T&E volume","source":"Perk product data (Snowflake)","weight":29.4,"strength":30}],"suppressed_signals":[]},"play":"am_cross_sell_spend","routing_notes":[],"action_id":"6f61a64a74e0","brief":{"why_now":"Travel customer, no Spend module, high T&E volume (5d ago): 6.5M EUR travel, expense tool is SAP Concur Expense","angle":"Bring expenses onto the same platform their travel already runs on","opener":"Keystone Pharma already books ~EUR 6,500,000 of travel on Perk; the receipts, per diems and card spend behind those trips are still handled elsewhere.","discovery_questions":["How do you reconcile travel invoices with expenses today?","How many hours a month does finance spend on expense reports?","When does your current expense tool renew?"],"next_step":"AM sends a 1-page ROI estimate built from their own Perk booking data","engine":"template","confidence":0.75,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"keystone-pharma.example"},"fields":{"GTM_Fit_Travel__c":62,"GTM_Fit_Spend__c":47,"GTM_Timing_Score__c":29,"GTM_Priority_Tier__c":"P2","GTM_Top_Signal__c":"Travel customer, no Spend module, high T&E volume","GTM_Play__c":"am_cross_sell_spend","GTM_Brief_Confidence__c":0.75,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P2] Cross-sell Spend to Travel customer","Owner":"Account Manager","External_Id__c":"6f61a64a74e0"}},"play_meta":{"label":"Cross-sell Spend to Travel customer","owner":"Account Manager","sla":"5 days","human_in_loop":true}},{"account":{"id":"CUS-104","name":"Saltmarsh Studios","domain":"saltmarsh.example","country":"ES","region":"EMEA","industry":"Media & Events","employees":150,"countries":2,"current_tool":"Perk Travel","is_customer":true,"products":["Travel"],"arr_eur":14000,"annual_travel_spend_eur":420000,"signals":[{"type":"support_escalations","days_ago":6,"evidence":"4 escalations on invoice reconciliation"}],"enrichment":{"sources":{},"credits":0.0,"log":[]}},"scores":{"fit_travel":47,"fit_spend":32,"fit":47,"timing":17,"priority":34,"tier":"P3","product_angle":"Travel-led","active_signals":[{"type":"support_escalations","days_ago":6,"evidence":"4 escalations on invoice reconciliation","label":"3+ support escalations in 30 days","source":"Zendesk","weight":17.4,"strength":20}],"suppressed_signals":[]},"play":"am_save_play","routing_notes":[],"action_id":"f15a0009a260","brief":{"why_now":"3+ support escalations in 30 days (6d ago): 4 escalations on invoice reconciliation","angle":"Retention risk: re-establish an owner and show value delivered","opener":"Book a value review with Saltmarsh Studios: savings, policy compliance and hours saved this year.","discovery_questions":["Who now owns travel admin after the change?","What changed in your travel volume this quarter?","Which reconciliation issues are still open?"],"next_step":"AM + CSM call within 48h; CSM fixes open escalations first","engine":"template","confidence":0.75,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"saltmarsh.example"},"fields":{"GTM_Fit_Travel__c":47,"GTM_Fit_Spend__c":32,"GTM_Timing_Score__c":17,"GTM_Priority_Tier__c":"P3","GTM_Top_Signal__c":"3+ support escalations in 30 days","GTM_Play__c":"am_save_play","GTM_Brief_Confidence__c":0.75,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P3] Churn-risk save play","Owner":"Account Manager + CSM","External_Id__c":"f15a0009a260"}},"play_meta":{"label":"Churn-risk save play","owner":"Account Manager + CSM","sla":"48 h","human_in_loop":true}},{"account":{"id":"CUS-105","name":"Ironclad Industrial","domain":"ironclad-ind.example","country":"US","region":"NA","industry":"Construction","employees":1900,"countries":2,"current_tool":"Perk Travel + Spend","is_customer":true,"products":["Travel","Spend"],"arr_eur":95000,"annual_travel_spend_eur":3100000,"signals":[{"type":"headcount_growth","days_ago":30,"evidence":"+22% headcount, 3 new job sites"}],"enrichment":{"sources":{},"credits":0.0,"log":[]}},"scores":{"fit_travel":47,"fit_spend":32,"fit":47,"timing":13,"priority":32,"tier":"P3","product_angle":"Travel-led","active_signals":[{"type":"headcount_growth","days_ago":30,"evidence":"+22% headcount, 3 new job sites","label":"Headcount +20% in 12 months","source":"Enrichment","weight":12.6,"strength":15}],"suppressed_signals":[]},"play":"am_expansion_watch","routing_notes":[],"action_id":"b97d0e91a737","brief":{"why_now":"Headcount +20% in 12 months (30d ago): +22% headcount, 3 new job sites","angle":"Travel-led: teams like yours cut booking time and keep every trip in policy without chasing approvals","opener":"Hi the, I noticed: +22% headcount, 3 new job sites. Companies at Ironclad Industrial's stage usually hit the point where travel and expenses outgrow Perk Travel + Spend. Worth 20 minutes?","discovery_questions":["How are trips booked and approved today?","How long does month-end expense close take?","Who owns travel policy, and how is it enforced?"],"next_step":"Discovery call; SDR attaches this brief to the meeting invite","engine":"template","confidence":0.75,"needs_review":false},"duplicate":false,"crm_payload":{"object":"Account","match_on":{"Website":"ironclad-ind.example"},"fields":{"GTM_Fit_Travel__c":47,"GTM_Fit_Spend__c":32,"GTM_Timing_Score__c":13,"GTM_Priority_Tier__c":"P3","GTM_Top_Signal__c":"Headcount +20% in 12 months","GTM_Play__c":"am_expansion_watch","GTM_Brief_Confidence__c":0.75,"GTM_Config_Version__c":"2026.11.0"},"task":{"Subject":"[P3] Expansion watch (seat growth)","Owner":"Account Manager","External_Id__c":"b97d0e91a737"}},"play_meta":{"label":"Expansion watch (seat growth)","owner":"Account Manager","sla":"next QBR","human_in_loop":false}}]}</script>
+<script>
+const RUN = JSON.parse(document.getElementById('runData').textContent);
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+$('#cfgv').textContent = RUN.config_version; $('#rund').textContent = RUN.run_date;
+
+/* ---------- View routing ---------- */
+const VIEWS = ['summary', 'system', 'plays', 'prototype', 'plan'];
+function route() {
+  const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'summary';
+  document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== v);
+  document.querySelectorAll('.viewtabs a').forEach(a => a.dataset.view === v ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+  window.scrollTo(0, 0);
+}
+addEventListener('hashchange', route); route();
+
+/* ---------- System: architecture ---------- */
+const K = { sys: 'k-sys', data: 'k-data', ai: 'k-ai', surf: 'k-surf' };
+const ARCH = [
+  { name: 'Sources', job: 'Everything we know about an account', nodes: [
+    { id: 'sfdc', k: 'sys', label: 'Salesforce', does: 'System of record for accounts, contacts, opportunities, activities and ownership.', inputs: 'Rep activity, opportunity stages', outputs: 'Accounts and ownership', owner: 'Revenue Systems' },
+    { id: 'product', k: 'data', label: 'Perk product data', does: 'Bookings, spend volume, modules in use and admins for every customer. The first-party moat.', inputs: 'Platform events', outputs: 'Usage and risk signals', owner: 'Data team' },
+    { id: 'web', k: 'sys', label: 'Web and forms', does: 'Known-account visits, pricing page views, demo requests.', inputs: 'Site analytics, reverse-IP', outputs: 'Inbound and intent signals', owner: 'Marketing Ops' },
+    { id: 'convo', k: 'sys', label: 'Gong and Zendesk', does: 'Calls, emails and support tickets as unstructured context.', inputs: 'Transcripts, tickets', outputs: 'Deal risk, escalations', owner: 'Revenue Systems, CX Ops' },
+    { id: 'third', k: 'sys', label: 'Third-party feeds', does: 'Job changes, job postings, funding and intent data (UserGems, PredictLeads, Bombora-type sources).', inputs: 'Vendor APIs', outputs: 'Timing signals', owner: 'GTM Eng' } ] },
+  { name: 'Data foundation', job: 'One account, one truth', nodes: [
+    { id: 'wh', k: 'data', label: 'Snowflake + dbt', does: 'Joins CRM, product and signal data into one tested GTM model.', inputs: 'All sources', outputs: 'Golden account and contact records', owner: 'Data team, GTM Eng' },
+    { id: 'idr', k: 'data', label: 'Identity resolution', does: 'Domain, legal-entity and parent-child matching, so each signal lands on the right account and owner.', inputs: 'Raw records', outputs: 'Resolved account IDs', owner: 'GTM Eng' },
+    { id: 'rett', k: 'data', label: 'Reverse ETL', does: 'Writes scores, tiers and briefs back into Salesforce fields reps already use.', inputs: 'Model outputs', outputs: 'CRM fields and tasks', owner: 'Revenue Systems' } ] },
+  { name: 'Enrichment', job: 'Fill the gaps, cheaply', nodes: [
+    { id: 'clay', k: 'data', label: 'Clay waterfall', does: 'Cheapest good provider first, the next only on a miss, every email verified. Coverage and cost tracked per provider and region.', inputs: 'Accounts with missing fields', outputs: 'Firmographics, buyer contacts', owner: 'GTM Eng' },
+    { id: 'claygent', k: 'ai', label: 'Research agent', does: 'Reads websites, filings and news to answer ICP questions a rule cannot: field workforce? new market entry? multi-entity?', inputs: 'Domain and ICP questions', outputs: 'Structured answers with confidence', owner: 'GTM Eng' } ] },
+  { name: 'Signals', job: 'What changed, and how recently', nodes: [
+    { id: 'sigc', k: 'data', label: 'Signal contracts', does: 'Strength, half-life, eligible motion, suppression rules and owner for every signal. Fit and timing stay in separate fields.', inputs: 'Events from sources', outputs: 'Decayed timing score per account', owner: 'GTM Eng, RevOps' } ] },
+  { name: 'Decision', job: 'Who, when, which play', nodes: [
+    { id: 'score', k: 'data', label: 'Fit + timing scoring', does: 'Two fit scores (Travel, Spend), one timing score, one priority tier. Weights live in versioned config.', inputs: 'Golden records and signals', outputs: 'Tier P1–P4 and product angle', owner: 'GTM Eng' },
+    { id: 'orch', k: 'data', label: 'Orchestration', does: 'Routing rules, capacity guards, cooldowns and suppression decide which record enters which play, when, and owned by whom.', inputs: 'Scores, ownership, capacity', outputs: 'Play assignments with idempotent action IDs', owner: 'GTM Eng' } ] },
+  { name: 'Agents', job: 'Work taken off people', nodes: [
+    { id: 'brief', k: 'ai', label: 'Brief writer', does: 'Turns signals and context into why-now, angle, opener and questions. Low confidence goes to human review.', inputs: 'Account context', outputs: 'Account brief', owner: 'GTM Eng' },
+    { id: 'af', k: 'ai', label: 'Agentforce Prospecting', does: 'The existing agent, now fed with scored accounts and first-party signals instead of a static list.', inputs: 'Tiered accounts', outputs: 'Sequenced outreach', owner: 'Sales, GTM Eng' },
+    { id: 'autofill', k: 'ai', label: 'CRM autofill', does: 'Proposes next steps, stakeholders and close-date changes from call transcripts. The rep approves in one click.', inputs: 'Gong transcripts', outputs: 'Proposed field updates', owner: 'Revenue Systems' },
+    { id: 'reply', k: 'ai', label: 'Reply classifier', does: 'Labels replies (interested, not now, wrong person, out of office), suggests a response and logs the signal that produced it.', inputs: 'Inbound replies', outputs: 'Labeled replies, CRM updates', owner: 'GTM Eng' } ] },
+  { name: 'Activation', job: 'Where reps actually work', nodes: [
+    { id: 'tasks', k: 'surf', label: 'Salesforce tasks', does: 'One task per action, upserted on the action ID, with the brief attached.', inputs: 'Play assignments', outputs: 'Rep work queue', owner: 'Revenue Systems' },
+    { id: 'seq', k: 'surf', label: 'Outreach / Salesloft', does: 'Signal-specific sequences. Enrollment is idempotent and suppressed when an opportunity is open.', inputs: 'Approved contacts and copy', outputs: 'Emails, calls, LinkedIn steps', owner: 'Sales Ops' },
+    { id: 'slack', k: 'surf', label: 'Slack alerts', does: 'Answers: why am I seeing this, why now, what do we know, what should I do. Accept or reject in one click.', inputs: 'P1 actions, risk alerts', outputs: 'Acceptance data for learning', owner: 'GTM Eng' },
+    { id: 'mcp', k: 'ai', label: 'MCP access', does: 'Reps ask Claude or ChatGPT about an account; the assistant reads the same governed data through MCP. Perk already ships an MCP server for its product.', inputs: 'Rep questions', outputs: 'Grounded answers', owner: 'GTM Eng' } ] },
+  { name: 'Measurement', job: 'Did it move a metric?', nodes: [
+    { id: 'logs', k: 'data', label: 'Run logs and health', does: 'Volume, coverage, duplicates, failures, latency and cost per verified contact, with drift alerts.', inputs: 'Every workflow run', outputs: 'Reliability dashboard', owner: 'GTM Eng' },
+    { id: 'impact', k: 'data', label: 'Impact scorecard', does: 'Pipeline by signal and play against holdout groups, stage conversion, hours returned, adoption.', inputs: 'CRM outcomes', outputs: 'Quarterly leadership readout', owner: 'GTM Eng, RevOps' },
+    { id: 'evals', k: 'ai', label: 'AI evals', does: 'Eval sets for every agent, run on every prompt or model change.', inputs: 'Agent outputs, human labels', outputs: 'Go / no-go for releases', owner: 'GTM Eng' } ] },
+];
+const TOUR = [
+  ['third', 'A job-change feed reports that Northwind Consulting (420 people, Madrid) hired a new CFO 12 days ago. A job post for a Travel & Expense Coordinator appeared 9 days ago.'],
+  ['idr', 'Both events are matched to the same Salesforce account by domain, so they stack instead of creating two half-records.'],
+  ['clay', 'The CFO\'s email is missing. Provider A finds it for 1 credit and verification confirms it. The pricier providers are never called.'],
+  ['sigc', 'The CFO signal (strength 30, half-life 90 days) still counts 27.4. The job post counts 21.8. Timing score: 49.'],
+  ['score', 'Fit is 83 for Travel and 78 for Spend: consulting, 4 countries, expenses in Excel. Both are high, so the angle is the Travel + Spend bundle. Tier P1.'],
+  ['brief', 'The brief writer drafts why-now, angle, opener and discovery questions. Confidence is 0.85, above the 0.70 floor, so no human review is needed.'],
+  ['tasks', 'A Salesforce task goes to the EMEA SDR pod with a 24-hour SLA. Its action ID makes sure a re-run never creates a duplicate.'],
+  ['impact', 'The outcome (meeting, opportunity, stage) flows back and is reported by signal and play against a holdout group.'],
+];
+const nodeById = {}; ARCH.forEach((L, i) => L.nodes.forEach(n => nodeById[n.id] = { ...n, layer: i }));
+const layersEl = $('#layers');
+ARCH.forEach((L, i) => {
+  const row = document.createElement('div'); row.className = 'layer'; row.dataset.layer = i;
+  row.innerHTML = `<div class="layer-name"><em>${String(i + 1).padStart(2, '0')}</em><b>${esc(L.name)}</b><span>${esc(L.job)}</span></div><div class="nodes"></div>`;
+  L.nodes.forEach(n => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'node' + (n.k === 'ai' ? ' ai' : '');
+    b.innerHTML = `<i class="${K[n.k]}" aria-hidden="true"></i>${esc(n.label)}`; b.setAttribute('aria-pressed', 'false'); b.dataset.id = n.id;
+    b.addEventListener('click', () => showNode(n.id)); $('.nodes', row).appendChild(b);
+  });
+  layersEl.appendChild(row);
+});
+function highlight(id) {
+  const n = nodeById[id];
+  document.querySelectorAll('.node').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === id)));
+  document.querySelectorAll('.layer').forEach(l => l.classList.toggle('lit', +l.dataset.layer === n.layer));
+  return n;
+}
+function showNode(id) {
+  const n = highlight(id);
+  $('#archPanel').innerHTML = `<p class="label">${esc(ARCH[n.layer].name)}</p><h3>${esc(n.label)} ${n.k === 'ai' ? '<span class="chip violet">AI agent</span>' : ''}</h3>
+    <p class="body">${esc(n.does)}</p><dl><dt>Uses</dt><dd>${esc(n.inputs)}</dd><dt>Produces</dt><dd>${esc(n.outputs)}</dd><dt>Owner</dt><dd>${esc(n.owner)}</dd></dl>
+    <button class="btn primary" type="button" id="tourStart">Follow one account through the system →</button>`;
+  $('#tourStart').addEventListener('click', () => showTour(0));
+}
+function showTour(i) {
+  const [id, text] = TOUR[i]; const n = highlight(id);
+  $('#archPanel').innerHTML = `<p class="label">Following Northwind Consulting · step ${i + 1} of ${TOUR.length}</p>
+    <h3>${esc(ARCH[n.layer].name)}: ${esc(n.label)}</h3><p class="body">${esc(text)}</p>
+    <div class="stepper"><button class="btn small" type="button" id="tPrev" ${i === 0 ? 'disabled' : ''}>← Back</button>
+      <div class="dots" aria-hidden="true">${TOUR.map((_, j) => `<i class="${j <= i ? 'on' : ''}"></i>`).join('')}</div>
+      ${i < TOUR.length - 1 ? '<button class="btn small primary" type="button" id="tNext">Next →</button>' : '<a class="btn small primary" href="#prototype">See it in the prototype →</a>'}</div>
+    <button class="btn small" type="button" id="tExit">Exit tour</button>`;
+  $('#tPrev').addEventListener('click', () => showTour(i - 1));
+  $('#tNext')?.addEventListener('click', () => showTour(i + 1));
+  $('#tExit').addEventListener('click', () => showNode(id));
+}
+showNode('orch');
+
+function decaySvg(hl) {
+  const W = 110, H = 28, pts = [];
+  for (let d = 0; d <= 180; d += 6) pts.push(`${(d / 180 * (W - 2) + 1).toFixed(1)},${(H - 3 - (H - 6) * Math.pow(0.5, d / hl)).toFixed(1)}`);
+  return `<svg class="decayline" viewBox="0 0 ${W} ${H}" role="img" aria-label="Half-life ${hl} days"><line x1="1" y1="${H - 3}" x2="${W - 1}" y2="${H - 3}" stroke="var(--line)" /><polyline points="${pts.join(' ')}" fill="none" stroke="var(--signal)" stroke-width="2" /></svg>`;
+}
+const MOTION = { new_logo: ['New logo', 'accent'], inbound: ['Inbound', 'signal'], any: ['Any', ''], expansion: ['Expansion', 'violet'], retention: ['Retention', 'crit'] };
+$('#sigRows').innerHTML = Object.values(RUN.signals_catalog).map(s => `<tr><td><b>${esc(s.label)}</b>${s.suppress_if.length ? '<br><small class="muted">Paused if an opportunity is open</small>' : ''}</td>
+  <td><span class="chip ${MOTION[s.motion][1]}">${MOTION[s.motion][0]}</span></td><td class="n">${s.strength}</td><td class="n">${s.half_life} days</td>
+  <td>${decaySvg(s.half_life)}</td><td>${esc(s.source)}</td><td>${esc(s.owner)}</td></tr>`).join('');
+
+/* ---------- Plays ---------- */
+const PLAYS_UI = {
+  SDR: { tab: 'SDR · new logos', plays: [
+    { t: 'Signal-based outbound', trig: 'High fit plus fresh timing, e.g. new CFO and a travel-manager job post', logic: 'Enrich and verify the buyer, pick Travel, Spend or bundle angle, respect capacity and cooldown', out: 'Task with a brief and a signal-specific sequence', own: 'SDR pod by region', kpi: 'Meetings per 100 accounts vs cold lists; first touch within 24 h' },
+    { t: 'Competitor renewal window', trig: 'Concur or Expensify contract renews within 6 months', logic: 'Start 5 months out; skip if an opportunity is already open', out: 'Displacement sequence with migration proof points', own: 'SDR with AE', kpi: 'Opportunities created before the renewal date' },
+    { t: 'Supervised AI SDR overflow', trig: 'P2 accounts, and P1 accounts beyond human capacity', logic: 'Agentforce drafts, an SDR approves in batch; low confidence goes to review', out: 'Approved sequence enrollments', own: 'AI SDR plus SDR reviewer', kpi: 'Reply rate vs human baseline; zero unworked P1s' } ] },
+  AE: { tab: 'AE · win deals', plays: [
+    { t: 'Inbound speed-to-lead', trig: 'Demo request from a known or enriched account', logic: 'Enrich, score, route to an AE by region and segment, book on the spot', out: 'Meeting booked in minutes, brief in the invite', own: 'AE', kpi: 'Form-to-meeting time; inbound conversion' },
+    { t: 'Meeting prep in one minute', trig: 'Calendar event with an external domain', logic: 'Pull CRM history, calls, product usage and news; list stakeholders and risks', out: 'One-page brief in Slack 30 minutes before the call', own: 'AE', kpi: 'Prep time saved; stage progression after first meeting' },
+    { t: 'CRM autofill', trig: 'A call ends or an email thread changes', logic: 'Extract next steps, stakeholders, competitors, date changes; propose, never overwrite', out: 'Field updates approved in one click', own: 'AE, Revenue Systems', kpi: 'Field completeness; forecast accuracy' } ] },
+  AM: { tab: 'AM · retain and expand', plays: [
+    { t: 'Spend cross-sell', trig: 'Travel customer without Spend and with high travel volume', logic: 'Size the opportunity from their own Perk bookings; check expense tool and renewal date', out: 'ROI estimate from their own data, plus an AM task', own: 'Account Manager', kpi: 'Spend attach rate; expansion pipeline' },
+    { t: 'Churn-risk save play', trig: 'Bookings down 30%+, champion left, or support escalations', logic: 'Risk outranks expansion; route to AM and CSM; fix open tickets first', out: 'Save plan with an owner and a 48-hour SLA', own: 'AM with CSM', kpi: 'Retention on flagged accounts vs holdout' },
+    { t: 'Account planning', trig: 'Quarterly, or headcount growth and new entities', logic: 'Map entities, countries and modules in use against potential', out: 'Account plan draft ready before the QBR', own: 'Account Manager', kpi: 'Whitespace covered; net revenue retention' } ] },
+};
+const roleTabs = $('#roleTabs');
+Object.entries(PLAYS_UI).forEach(([k, r], i) => {
+  const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.textContent = r.tab; b.dataset.k = k;
+  b.setAttribute('aria-selected', String(i === 0)); b.addEventListener('click', () => showPlays(k)); roleTabs.appendChild(b);
+});
+function showPlays(k) {
+  roleTabs.querySelectorAll('button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.k === k)));
+  $('#playCards').innerHTML = PLAYS_UI[k].plays.map(p => `<article class="card play"><h3>${esc(p.t)}</h3><div class="flow">
+    <div><b>When</b><span>${esc(p.trig)}</span></div><div><b>Logic</b><span>${esc(p.logic)}</span></div>
+    <div><b>Rep gets</b><span>${esc(p.out)}</span></div><div><b>Owner</b><span>${esc(p.own)}</span></div></div>
+    <p class="proof">Proof: ${esc(p.kpi)}</p></article>`).join('');
+}
+showPlays('SDR');
+
+/* ---------- Prototype: decision layer ported from gtm/routing.py ---------- */
+const DEFAULTS = { wFit: 0.55, p1Fit: 65, p1Tim: 40, cap: 2 };
+const ctl = { wFit: $('#wFit'), p1Fit: $('#p1Fit'), p1Tim: $('#p1Tim'), cap: $('#cap') };
+const DEST = {
+  sdr: { label: 'Human SDR', color: 'var(--accent)', ink: 'var(--accent-ink)', plays: ['signal_outbound_sdr'] },
+  ai: { label: 'AI SDR, supervised', color: 'var(--violet)', ink: 'var(--surface)', plays: ['ai_sdr_supervised'] },
+  ae: { label: 'AE', color: 'var(--signal)', ink: 'var(--surface)', plays: ['inbound_speed_to_lead', 'deal_signal_to_ae'] },
+  am: { label: 'AM', color: 'var(--crit)', ink: 'var(--surface)', plays: ['am_save_play', 'am_cross_sell_spend', 'am_expansion_watch'] },
+  other: { label: 'Nurture or hold', color: 'var(--line)', ink: 'var(--ink)', plays: ['marketing_nurture', 'hold_cooldown', 'no_action'] },
+};
+const destOf = play => Object.keys(DEST).find(k => DEST[k].plays.includes(play));
+const SHORT = { signal_outbound_sdr: 'Signal outbound', ai_sdr_supervised: 'AI SDR sequence', inbound_speed_to_lead: 'Inbound, book now', deal_signal_to_ae: 'Signal to deal owner',
+  am_save_play: 'Churn save play', am_cross_sell_spend: 'Cross-sell Spend', am_expansion_watch: 'Expansion watch', marketing_nurture: 'Nurture', hold_cooldown: 'Hold: cooldown', no_action: 'No action' };
+const CHIP = { sdr: 'accent', ai: 'violet', ae: 'signal', am: 'crit', other: '' };
+let selected = 'ACC-001', filter = 'all', current = [];
+
+function tierOf(fit, t, p) { if (fit >= p.p1Fit && t >= p.p1Tim) return 'P1'; if (fit >= 55 && t >= 25) return 'P2'; if (fit >= 40) return 'P3'; return 'P4'; }
+function playOf(acc, types, tier) {
+  if (acc.is_customer) {
+    if (['bookings_drop', 'champion_left', 'support_escalations'].some(x => types.has(x))) return 'am_save_play';
+    if (types.has('travel_only_high_spend') && !(acc.products || []).includes('Spend')) return 'am_cross_sell_spend';
+    return types.size ? 'am_expansion_watch' : 'no_action';
+  }
+  if (types.has('demo_request')) return 'inbound_speed_to_lead';
+  if (acc.open_opportunity) return 'deal_signal_to_ae';
+  if (acc.last_contacted_days != null && acc.last_contacted_days < 14) return 'hold_cooldown';
+  return { P1: 'signal_outbound_sdr', P2: 'ai_sdr_supervised', P3: 'marketing_nurture' }[tier] || 'no_action';
+}
+function decide(p) {
+  const rows = RUN.decisions.map(d => {
+    const s = d.scores, types = new Set(s.active_signals.map(x => x.type));
+    const tier = tierOf(s.fit, s.timing, p);
+    return { d, priority: Math.round(p.wFit * s.fit + (1 - p.wFit) * s.timing), tier, play: playOf(d.account, types, tier), notes: [] };
+  });
+  const used = {};
+  [...rows].sort((a, b) => b.priority - a.priority).forEach(r => {
+    if (r.play !== 'signal_outbound_sdr') return;
+    const reg = r.d.account.region; used[reg] = (used[reg] || 0) + 1;
+    if (used[reg] > p.cap) { r.play = 'ai_sdr_supervised'; r.notes.push(`The ${reg} SDR pod is at capacity, so this account overflows to the supervised AI SDR.`); }
+  });
+  return rows.sort((a, b) => b.priority - a.priority);
+}
+const params = () => ({ wFit: +ctl.wFit.value, p1Fit: +ctl.p1Fit.value, p1Tim: +ctl.p1Tim.value, cap: +ctl.cap.value });
+function render() {
+  const p = params();
+  $('#wFitOut').textContent = `${Math.round(p.wFit * 100)} / ${Math.round((1 - p.wFit) * 100)}`;
+  $('#p1FitOut').textContent = p.p1Fit; $('#p1TimOut').textContent = p.p1Tim; $('#capOut').textContent = p.cap;
+  current = decide(p);
+  const changed = current.filter(r => r.play !== r.d.play).length;
+  const par = $('#parity');
+  par.className = 'parity' + (changed ? ' diff' : '');
+  par.innerHTML = changed ? `<i></i><span><b>${changed} of 19</b> accounts change destination vs the reference run.</span>` : '<i></i><span>Matches the Python reference run: all 19 decisions agree.</span>';
+  const counts = Object.fromEntries(Object.keys(DEST).map(k => [k, current.filter(r => destOf(r.play) === k).length]));
+  $('#dist').setAttribute('aria-label', Object.entries(counts).map(([k, v]) => `${DEST[k].label} ${v}`).join(', '));
+  $('#dist').innerHTML = Object.entries(counts).filter(([, v]) => v).map(([k, v]) => `<div style="flex:${v};background:${DEST[k].color};color:${DEST[k].ink}">${v}</div>`).join('');
+  $('#distLegend').innerHTML = Object.entries(counts).map(([k, v]) => `<span><i style="background:${DEST[k].color}"></i>${DEST[k].label}: <b>${v}</b></span>`).join('');
+  $('#filters').innerHTML = [['all', 'All', 19], ...Object.keys(DEST).map(k => [k, DEST[k].label, counts[k]])]
+    .map(([k, l, c]) => `<button type="button" data-f="${k}" aria-pressed="${filter === k}">${l}<span>${c}</span></button>`).join('');
+  $('#filters').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { filter = b.dataset.f; render(); }));
+  const shown = current.filter(r => filter === 'all' || destOf(r.play) === filter);
+  if (!shown.some(r => r.d.account.id === selected) && shown.length) selected = shown[0].d.account.id;
+  $('#rows').innerHTML = shown.map(r => {
+    const a = r.d.account, s = r.d.scores, dk = destOf(r.play), diff = r.play !== r.d.play;
+    return `<tr data-id="${a.id}" aria-selected="${a.id === selected}" tabindex="0">
+      <td class="acct"><b>${esc(a.name)}</b><small>${a.is_customer ? 'Customer' : 'Prospect'} · ${a.region} · ${esc(a.industry)}</small></td>
+      <td class="n">${s.fit}</td><td class="n">${s.timing}<span class="meter"><i style="width:${s.timing}%"></i></span></td>
+      <td><span class="tier ${r.tier}">${r.tier}</span></td>
+      <td><span class="chip ${CHIP[dk]}">${SHORT[r.play]}</span>${diff ? '<span class="dot" title="Changed vs reference run"></span>' : ''}</td></tr>`;
+  }).join('');
+  document.querySelectorAll('#rows tr').forEach(tr => {
+    tr.addEventListener('click', () => select(tr.dataset.id));
+    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(tr.dataset.id); } });
+  });
+  const m = RUN.metrics, review = RUN.decisions.filter(d => d.brief.needs_review).length;
+  $('#health').innerHTML = [[`${m.verified_email_pct}%`, 'verified buyer emails'], [m.credits_per_verified_contact, 'credits per verified contact'],
+    [review, 'briefs sent to human review'], [`${Math.round(m.manual_minutes_replaced / 60)} h`, 'manual work replaced']]
+    .map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
+  showDetail();
+}
+function select(id) { selected = id; document.querySelectorAll('#rows tr').forEach(tr => tr.setAttribute('aria-selected', String(tr.dataset.id === id))); showDetail(); }
+function showDetail() {
+  const r = current.find(x => x.d.account.id === selected);
+  if (!r) { $('#detail').innerHTML = '<p class="body">No accounts in this group.</p>'; return; }
+  const { account: a, scores: s, brief: b } = r.d, meta = RUN.plays[r.play], dk = destOf(r.play);
+  const notes = [...r.notes];
+  s.suppressed_signals.forEach(x => notes.push(`"${RUN.signals_catalog[x.type].label}" is paused because an opportunity is already open.`));
+  if (a.last_contacted_days != null && a.last_contacted_days < 14) notes.push(`Contacted ${a.last_contacted_days} days ago, inside the 14-day cooldown.`);
+  const c = a.finance_contact;
+  const contact = c ? `${esc(c.name)}, ${esc(c.title)} <span class="chip ${c.email_status === 'valid' ? 'accent' : 'signal'}">email ${c.email_status === 'valid' ? 'verified' : c.email_status.replace('_', '-')}</span>` : (a.is_customer ? 'Existing customer: contacts already in the CRM' : 'Not found');
+  const payload = { object: 'Account', match_on: { Website: a.domain }, fields: { GTM_Fit_Travel__c: s.fit_travel, GTM_Fit_Spend__c: s.fit_spend, GTM_Timing_Score__c: s.timing,
+    GTM_Priority_Tier__c: r.tier, GTM_Top_Signal__c: s.active_signals[0]?.label ?? null, GTM_Play__c: r.play, GTM_Brief_Confidence__c: b.confidence, GTM_Config_Version__c: RUN.config_version },
+    task: ['no_action', 'hold_cooldown', 'marketing_nurture'].includes(r.play) ? null : { Subject: `[${r.tier}] ${meta.label}`, Owner: meta.owner, External_Id__c: r.d.action_id } };
+  $('#detail').innerHTML = `
+    <div class="stack-v" style="gap:6px"><p class="label">${a.is_customer ? 'Customer' : 'Prospect'} · ${esc(a.industry)} · ${esc(a.country)}</p><h3>${esc(a.name)}</h3>
+      <p class="muted">${a.employees ? a.employees.toLocaleString('en') + ' employees' : 'Size unknown'} · ${a.countries} countries · today: ${esc(a.current_tool)}</p></div>
+    <div class="stack-v" style="gap:8px"><p><span class="tier ${r.tier}">${r.tier}</span> <span class="chip ${CHIP[dk]}">${esc(meta.label)}</span></p>
+      <p style="font-size:.93rem">Owner: <b>${esc(meta.owner)}</b> · SLA ${esc(meta.sla)}${meta.human_in_loop ? ' · human approves' : ''}<br>Angle: <b>${esc(s.product_angle)}</b> · Fit Travel ${s.fit_travel}, Spend ${s.fit_spend}</p>
+      ${notes.length ? `<ul class="notes">${notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}</div>
+    <div class="stack-v" style="gap:10px"><p class="label">Why now</p>${s.active_signals.length ? s.active_signals.map(x => `<div class="sig"><div class="top"><span>${esc(x.label)}</span><span class="num">${x.weight} of ${x.strength}</span></div>
+      <div class="decay"><i style="width:${Math.round(100 * x.weight / x.strength)}%"></i></div><small>${x.days_ago} days ago · ${esc(x.evidence)}</small></div>`).join('') : '<p class="muted">No active signals.</p>'}</div>
+    <div class="stack-v" style="gap:6px"><p class="label">What the rep receives</p><div class="brief">
+      <p><b>Buyer:</b> ${contact}</p><p><b>Opener:</b> <q>${esc(b.opener)}</q></p><p><b>Angle:</b> ${esc(b.angle)}</p>
+      <p><b>Ask:</b> ${b.discovery_questions.map(esc).join(' · ')}</p><p><b>Next step:</b> ${esc(b.next_step)}</p>
+      <p class="muted">Confidence ${b.confidence} · ${b.needs_review ? '<span class="chip crit">goes to human review</span>' : '<span class="chip accent">auto-approved</span>'}</p></div></div>
+    <details class="more"><summary>Enrichment waterfall · ${a.enrichment.credits} credits</summary><div class="log">${a.enrichment.log.length ? a.enrichment.log.map(l => `<span>${esc(l)}</span>`).join('') : '<span>Nothing missing, no provider called</span>'}</div></details>
+    <details class="more"><summary>Salesforce write-back</summary><pre class="code">${esc(JSON.stringify(payload, null, 2))}</pre></details>`;
+}
+Object.values(ctl).forEach(el => el.addEventListener('input', render));
+$('#resetBtn').addEventListener('click', () => { Object.entries(DEFAULTS).forEach(([k, v]) => ctl[k].value = v); filter = 'all'; render(); });
+render();
+
+/* ---------- Business case ---------- */
+const calcIds = ['hSDR', 'sSDR', 'hAE', 'sAE', 'hAM', 'sAM', 'weeks', 'rate', 'reinvest'];
+function calc() {
+  const v = Object.fromEntries(calcIds.map(id => [id, Math.max(0, +$('#' + id).value || 0)]));
+  const hours = (v.hSDR * v.sSDR + v.hAE * v.sAE + v.hAM * v.sAM) * v.weeks;
+  $('#outHours').textContent = Math.round(hours).toLocaleString('en');
+  $('#outFte').textContent = (hours * Math.min(100, v.reinvest) / 100 / 1600).toFixed(0);
+  $('#outValue').textContent = 'EUR ' + (hours * v.rate / 1e6).toFixed(1) + 'M';
+}
+calcIds.forEach(id => $('#' + id).addEventListener('input', calc)); calc();
+</script>
