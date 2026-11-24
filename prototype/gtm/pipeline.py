@@ -38,6 +38,7 @@ def crm_payload(acc: dict, s: dict, d: dict) -> dict:
             "GTM_Priority_Tier__c": s["tier"],
             "GTM_Top_Signal__c": s["active_signals"][0]["label"] if s["active_signals"] else None,
             "GTM_Play__c": d["play"],
+            "SDR_Owner_Pod__c": d["pod"],
             "GTM_Brief_Confidence__c": d["brief"]["confidence"],
             "GTM_Config_Version__c": config.CONFIG_VERSION,
         },
@@ -61,7 +62,7 @@ def run(reset: bool = False) -> dict:
             exceptions.append({"id": acc["id"], "reason": "employees not found after waterfall"})
         s = scoring.score(acc)
         play = routing.choose_play(acc, s)
-        decisions.append({"account": acc, "scores": s, "play": play, "routing_notes": []})
+        decisions.append({"account": acc, "scores": s, "play": play, "pod": routing.owner_pod(acc), "routing_notes": []})
 
     routing.apply_capacity(decisions)
 

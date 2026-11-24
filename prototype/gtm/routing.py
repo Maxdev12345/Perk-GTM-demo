@@ -27,6 +27,14 @@ PLAYS = {
 }
 
 
+def owner_pod(acc: dict) -> str:
+    """Rules of Engagement: Global pod for large or multi-country accounts, otherwise the regional pod."""
+    rule = config.GLOBAL_ACCOUNT_RULE
+    if (acc.get("employees") or 0) >= rule["min_employees"] or acc.get("countries", 1) >= rule["min_countries"]:
+        return "Global"
+    return acc["region"]
+
+
 def choose_play(acc: dict, s: dict) -> str:
     types = {x["type"] for x in s["active_signals"]}
     if acc.get("is_customer"):
@@ -56,13 +64,13 @@ def apply_capacity(decisions: list) -> list:
     """SDR capacity guard: overflow P1 accounts go to the supervised AI SDR
     instead of sitting unworked in a rep's queue (which shows up later as 'low
     conversion' rather than 'unworked')."""
-    by_region = {}
+    by_pod = {}
     for d in sorted(decisions, key=lambda d: -d["scores"]["priority"]):
         if d["play"] != "signal_outbound_sdr":
             continue
-        region = d["account"]["region"]
-        by_region[region] = by_region.get(region, 0) + 1
-        if by_region[region] > config.SDR_CAPACITY_PER_RUN:
+        pod = d["pod"]
+        by_pod[pod] = by_pod.get(pod, 0) + 1
+        if by_pod[pod] > config.SDR_CAPACITY_PER_RUN:
             d["play"] = "ai_sdr_supervised"
-            d["routing_notes"].append(f"SDR pod {region} at capacity -> overflow to supervised AI SDR")
+            d["routing_notes"].append(f"SDR pod {pod} at capacity -> overflow to supervised AI SDR")
     return decisions

@@ -67,3 +67,10 @@ def test_tiers_respect_thresholds():
 def test_every_signal_has_a_contract():
     for spec in config.SIGNALS.values():
         assert {"strength", "half_life", "motion", "source", "owner", "suppress_if"} <= spec.keys()
+
+
+def test_rules_of_engagement_global_vs_regional():
+    assert routing.owner_pod(_acc("ACC-003")) == "Global"   # 8 countries
+    assert routing.owner_pod(_acc("ACC-011")) == "Global"   # 3,200 employees
+    assert routing.owner_pod(_acc("ACC-001")) == "EMEA"
+    assert routing.owner_pod(_acc("ACC-010")) == "NA"

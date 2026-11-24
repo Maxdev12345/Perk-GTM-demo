@@ -93,6 +93,10 @@ TIERS = [  # evaluated top-down
     ("P3", dict(min_fit=40, min_timing=0)),
 ]
 
+# Rules of Engagement: who owns an account.
+# Global accounts (large or multi-country) go to the Global pod, the rest to the regional pod.
+GLOBAL_ACCOUNT_RULE = dict(min_employees=2000, min_countries=6)
+
 # Routing
 SDR_CAPACITY_PER_RUN = 2        # new accounts a single SDR pod can absorb per run
 AI_CONFIDENCE_FLOOR = 0.70      # below this, the brief goes to a human review queue

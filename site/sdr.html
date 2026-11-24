@@ -1,0 +1,715 @@
+<title>SDR Engine · Massimo Mauri</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: airport wayfinding. Black sign bar with gate letters as nav; five views; the departures board is the working prototype. */
+:root {
+  --paper: #E9E9E4;
+  --paper-2: #DCDCD5;
+  --panel: #F6F6F2;
+  --ink: #121212;
+  --ink-2: #3A3A37;
+  --ink-3: #5E5E58;
+  --rule: #BDBDB5;
+  --sign: #FFC800;
+  --sign-ink: #121212;
+  --board: #101112;
+  --flap: #1C1D1F;
+  --flap-line: #2A2B2E;
+  --board-ink: #F2F2EE;
+  --go: #1E8A4C;
+  --stop: #C8372D;
+  --f-sign: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #161615; --paper-2: #20201E; --panel: #1C1C1A; --ink: #EDEDE8; --ink-2: #C9C9C2; --ink-3: #9C9C94; --rule: #3A3A36;
+    --go: #3FB872; --stop: #F0675C; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #161615; --paper-2: #20201E; --panel: #1C1C1A; --ink: #EDEDE8; --ink-2: #C9C9C2; --ink-3: #9C9C94; --rule: #3A3A36;
+  --go: #3FB872; --stop: #F0675C; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 17px; line-height: 1.55; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--board); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--f-sign); margin: 0; text-wrap: balance; }
+h1 { font-weight: 800; font-stretch: 72%; font-size: clamp(2.8rem, 6vw, 5rem); line-height: .92; letter-spacing: -0.01em; text-transform: uppercase; }
+h2 { font-weight: 800; font-stretch: 78%; font-size: clamp(2rem, 4.6vw, 3.4rem); line-height: .95; text-transform: uppercase; }
+h3 { font-weight: 700; font-stretch: 90%; font-size: 1.3rem; line-height: 1.15; }
+p { margin: 0; }
+ul, ol { margin: 0; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--sign); outline-offset: 2px; }
+.mono { font-family: var(--f-mono); }
+.num { font-variant-numeric: tabular-nums; }
+.lede { font-size: 1.2rem; color: var(--ink-2); max-width: 60ch; }
+.small { font-size: .9rem; color: var(--ink-3); }
+.kicker { display: inline-flex; align-items: center; gap: 10px; font-family: var(--f-sign); font-weight: 700; font-stretch: 85%; text-transform: uppercase; letter-spacing: .04em; font-size: .95rem; }
+.gate { display: inline-grid; place-items: center; width: 1.7em; height: 1.7em; background: var(--sign); color: var(--sign-ink); font-family: var(--f-sign); font-weight: 900; border-radius: 3px; }
+
+/* Sign bar */
+.signbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--board); color: var(--board-ink); }
+.signbar .wrap { display: flex; align-items: center; gap: 18px; min-height: 64px; }
+.who { font-family: var(--f-sign); font-stretch: 80%; text-transform: uppercase; line-height: 1.05; white-space: nowrap; }
+.who b { display: block; font-weight: 800; font-size: 1.15rem; }
+.who span { font-size: .78rem; color: #B9B9B2; letter-spacing: .05em; }
+.nav { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+.nav a { display: flex; align-items: center; gap: 9px; min-height: 46px; padding: 0 12px; text-decoration: none; font-family: var(--f-sign); font-stretch: 85%; font-weight: 700; text-transform: uppercase; font-size: .95rem; white-space: nowrap; border-radius: 4px; color: #D9D9D3; }
+.nav a .gate { width: 1.6em; height: 1.6em; font-size: .9rem; background: transparent; border: 2px solid #5A5A56; color: #D9D9D3; }
+.nav a:hover { color: #fff; }
+.nav a[aria-current="page"] { color: var(--sign); }
+.nav a[aria-current="page"] .gate { background: var(--sign); border-color: var(--sign); color: var(--sign-ink); }
+@media (max-width: 820px) { .signbar .wrap { flex-wrap: wrap; gap: 2px; padding-block: 8px; } .nav { margin-left: -8px; width: calc(100% + 8px); } }
+
+.view { padding-block: 48px 72px; }
+.view-head { display: grid; gap: 16px; margin-bottom: 40px; max-width: 900px; }
+.onward { margin-top: 56px; display: flex; justify-content: flex-end; }
+.onward a { display: inline-flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 22px 0 14px; background: var(--sign); color: var(--sign-ink); text-decoration: none; font-family: var(--f-sign); font-weight: 800; font-stretch: 80%; text-transform: uppercase; font-size: 1.2rem; border-radius: 4px; }
+.onward a .gate { background: var(--sign-ink); color: var(--sign); }
+.onward a:hover { filter: brightness(.95); }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 12px; }
+@media (max-width: 940px) { .hero { grid-template-columns: minmax(0, 1fr); } }
+.hero h1 .hl { background: var(--sign); color: var(--sign-ink); padding: 0 .08em; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.hero-copy { display: grid; gap: 22px; }
+.disclaimer { font-size: .85rem; color: var(--ink-3); max-width: 60ch; }
+
+/* Departure board (shared by hero teaser and Board view) */
+.board { background: var(--board); color: var(--board-ink); border-radius: 6px; padding: 14px; font-family: var(--f-mono); overflow-x: auto; }
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 2px 4px 12px; border-bottom: 1px solid var(--flap-line); margin-bottom: 8px; }
+.board-title { font-family: var(--f-sign); font-weight: 800; font-stretch: 80%; text-transform: uppercase; font-size: 1.25rem; color: var(--sign); letter-spacing: .02em; display: flex; align-items: center; gap: 10px; }
+.board-title svg { flex: none; }
+.clock { font-size: 1.05rem; color: var(--board-ink); }
+.b-row { display: grid; grid-template-columns: var(--cols); gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--flap-line); min-width: var(--minw, 0); }
+.b-row.h { color: #8D8D88; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; border-bottom: 0; padding-bottom: 2px; }
+.b-row:last-child { border-bottom: 0; }
+button.b-row { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--flap-line); text-align: left; cursor: pointer; font: inherit; color: inherit; }
+button.b-row:hover { background: #18191B; }
+button.b-row[aria-pressed="true"] { background: #232117; box-shadow: inset 3px 0 0 var(--sign); }
+.flaps { display: inline-flex; gap: 2px; white-space: nowrap; }
+.flaps i { font-style: normal; display: inline-grid; place-items: center; width: .82em; height: 1.45em; background: var(--flap); border-radius: 2px; position: relative; font-size: .95rem; font-weight: 500; line-height: 1; color: var(--board-ink); }
+.flaps i::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: #000; opacity: .6; }
+.flaps.y i { color: var(--sign); }
+.flaps.flip i { animation: flip .32s steps(3) both; animation-delay: var(--d, 0ms); }
+@keyframes flip { 0% { transform: scaleY(1); } 50% { transform: scaleY(.2); } 100% { transform: scaleY(1); } }
+.status { font-weight: 600; font-size: .85rem; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.st-go { color: #57D68D; } .st-ai { color: #9FB7FF; } .st-ae { color: var(--sign); } .st-hold { color: #B9B9B2; } .st-x { color: #FF7A6E; }
+.blink { animation: blink 1.2s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .5; } }
+.status .flaps i { color: inherit; }
+.acct-cell { min-width: 0; }
+.acct-cell b { display: block; font-family: var(--f-body); font-weight: 700; font-size: .98rem; color: var(--board-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acct-cell span { font-size: .75rem; color: #9A9A94; }
+.teaser { --cols: 80px minmax(0, 1fr) 96px 104px; --minw: 470px; }
+.teaser .b-row { padding: 9px 4px; }
+
+/* Brief view */
+.claims { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: 8px; border-top: 3px solid var(--ink); }
+.claim { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.25fr) 96px; gap: 20px; align-items: start; padding: 18px 0; border-bottom: 1px solid var(--rule); }
+.claim .ask { font-family: var(--f-sign); font-weight: 700; font-stretch: 85%; font-size: 1.15rem; line-height: 1.2; }
+.claim .did { color: var(--ink-2); }
+.claim .tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tool { font-family: var(--f-mono); font-size: .78rem; padding: 2px 8px; border: 1px solid var(--rule); border-radius: 3px; color: var(--ink-2); background: var(--panel); }
+.stamp { justify-self: end; font-family: var(--f-sign); font-weight: 800; font-stretch: 75%; text-transform: uppercase; font-size: .8rem; letter-spacing: .06em; color: var(--go); border: 2px solid currentColor; padding: 4px 8px; border-radius: 4px; transform: rotate(-6deg); white-space: nowrap; }
+.claim.in .stamp { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) { .claim.in.seen .stamp { animation: stampin .35s cubic-bezier(.2,1.6,.4,1) both; animation-delay: var(--d, 0ms); } }
+.claim.in.seen .stamp { opacity: 1; }
+@keyframes stampin { from { opacity: 0; transform: rotate(-6deg) scale(1.8); } to { opacity: 1; transform: rotate(-6deg) scale(1); } }
+@media (max-width: 760px) { .claim { grid-template-columns: minmax(0, 1fr) auto; } .claim .did { grid-column: 1 / -1; grid-row: 2; } }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; }
+@media (max-width: 860px) { .split { grid-template-columns: minmax(0, 1fr); } }
+.section { margin-top: 64px; display: grid; gap: 22px; }
+.bigline { font-family: var(--f-sign); font-weight: 700; font-stretch: 85%; font-size: clamp(1.4rem, 2.6vw, 2rem); line-height: 1.15; max-width: 30ch; }
+.bigline mark { background: var(--sign); color: var(--sign-ink); padding: 0 .1em; }
+
+/* Playbook: route map */
+.route { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 940px) { .route { grid-template-columns: minmax(0, 1fr); } }
+.mapbox { background: var(--panel); border: 2px solid var(--ink); border-radius: 6px; padding: 10px; overflow-x: auto; }
+.mapbox svg { display: block; width: 100%; min-width: 640px; height: auto; }
+.st { cursor: pointer; }
+.st circle { fill: var(--panel); stroke: var(--ink); stroke-width: 4; transition: r .15s; }
+.st:hover circle, .st:focus circle { r: 13; }
+.st[aria-pressed="true"] circle { fill: var(--sign); }
+.st text { font-family: var(--f-sign); font-weight: 700; font-stretch: 85%; font-size: 15px; fill: var(--ink); text-transform: uppercase; }
+.st .sub { font-family: var(--f-mono); font-weight: 400; font-size: 11px; fill: var(--ink-3); text-transform: none; }
+.station { border-top: 6px solid var(--ink); background: var(--panel); padding: 20px; display: grid; gap: 14px; position: sticky; top: 90px; }
+.station dl { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px 14px; margin: 0; }
+.station dt { font-family: var(--f-sign); font-stretch: 85%; font-weight: 700; text-transform: uppercase; font-size: .85rem; color: var(--ink-3); padding-top: 2px; }
+.station dd { margin: 0; }
+.line-tag { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-mono); font-size: .8rem; }
+.line-tag i { width: 26px; height: 6px; border-radius: 3px; display: inline-block; }
+.ladder { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; }
+@media (max-width: 860px) { .ladder { grid-template-columns: minmax(0, 1fr); } }
+.rung { padding: 16px; display: grid; gap: 8px; align-content: start; border-right: 2px solid var(--ink); background: var(--panel); }
+.rung:last-child { border-right: 0; background: var(--sign); color: var(--sign-ink); }
+@media (max-width: 860px) { .rung { border-right: 0; border-bottom: 2px solid var(--ink); } .rung:last-child { border-bottom: 0; } }
+.rung b { font-family: var(--f-sign); font-weight: 800; font-stretch: 80%; text-transform: uppercase; font-size: 1.2rem; }
+.rung p { font-size: .93rem; }
+.rung .exit { font-family: var(--f-mono); font-size: .76rem; opacity: .8; }
+.rules { display: grid; gap: 0; border-top: 3px solid var(--ink); }
+.rule-row { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+.rule-row .gate { width: 36px; height: 36px; font-size: 1.05rem; }
+.rule-row b { display: block; font-family: var(--f-sign); font-stretch: 88%; font-size: 1.08rem; }
+.cadence { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; background: var(--panel); }
+@media (max-width: 900px) { .cadence { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .cadence { grid-template-columns: minmax(0, 1fr); } }
+.cad { padding: 18px; display: grid; gap: 10px; align-content: start; border-right: 1px solid var(--rule); }
+.cad:last-child { border-right: 0; }
+.cad h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.cad h3 span { font-family: var(--f-mono); font-weight: 400; font-size: .75rem; color: var(--ink-3); }
+.cad ul { padding: 0; list-style: none; display: grid; gap: 10px; }
+.cad li { display: grid; gap: 2px; font-size: .94rem; }
+.cad li b { font-weight: 700; }
+.cad li span { color: var(--ink-3); font-size: .85rem; }
+
+/* Board view */
+.ctrls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 22px; align-items: end; padding: 18px 20px; background: var(--panel); border: 2px solid var(--ink); border-radius: 6px; }
+@media (max-width: 900px) { .ctrls { grid-template-columns: minmax(0, 1fr); } }
+.ctrls label { display: grid; gap: 4px; font-weight: 700; }
+.ctrls label span.top { display: flex; justify-content: space-between; gap: 8px; }
+.ctrls output { font-family: var(--f-mono); background: var(--ink); color: var(--paper); padding: 0 6px; border-radius: 3px; }
+.ctrls small { font-weight: 400; color: var(--ink-3); font-size: .85rem; }
+.ctrls input[type=range] { width: 100%; accent-color: var(--ink); min-height: 30px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 16px; border: 2px solid var(--ink); background: transparent; border-radius: 4px; cursor: pointer; font-family: var(--f-sign); font-weight: 700; font-stretch: 85%; text-transform: uppercase; }
+.btn.y { background: var(--sign); color: var(--sign-ink); border-color: var(--sign); }
+.btn:hover { filter: brightness(.96); }
+.boardwrap { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 22px; align-items: start; margin-top: 22px; }
+@media (max-width: 1040px) { .boardwrap { grid-template-columns: minmax(0, 1fr); } }
+.main-board { --cols: 80px minmax(150px, 1fr) 98px 46px 150px; --minw: 640px; }
+.legend-line { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: .88rem; color: var(--ink-3); }
+.feed { margin-top: 10px; font-family: var(--f-mono); font-size: .82rem; color: var(--ink-2); min-height: 1.4em; }
+.totals { display: flex; flex-wrap: wrap; gap: 0; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; margin-top: 22px; background: var(--panel); }
+.totals div { flex: 1 1 120px; padding: 12px 14px; border-right: 1px solid var(--rule); display: grid; gap: 2px; }
+.totals div:last-child { border-right: 0; }
+.totals b { font-family: var(--f-sign); font-weight: 800; font-stretch: 80%; font-size: 2rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.totals span { font-size: .85rem; color: var(--ink-2); line-height: 1.25; }
+
+/* Handoff pass */
+.pass { background: var(--panel); border: 2px solid var(--ink); border-radius: 10px; display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; position: sticky; top: 90px; }
+.pass-top { background: var(--sign); color: var(--sign-ink); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-family: var(--f-sign); font-weight: 800; font-stretch: 80%; text-transform: uppercase; }
+.pass-body { padding: 16px; display: grid; gap: 14px; }
+.pass-route { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 10px; }
+.pass-route .code { font-family: var(--f-sign); font-weight: 900; font-stretch: 70%; font-size: 2.6rem; line-height: .9; text-transform: uppercase; }
+.pass-route .lbl { font-family: var(--f-mono); font-size: .72rem; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; }
+.pass-route .plane { padding-bottom: 6px; }
+.pass-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; border-top: 1px dashed var(--rule); border-bottom: 1px dashed var(--rule); padding: 10px 0; }
+.pass-grid div { display: grid; gap: 0; }
+.pass-grid span { font-family: var(--f-mono); font-size: .68rem; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; }
+.pass-grid b { font-family: var(--f-sign); font-stretch: 88%; font-size: 1rem; }
+.checks { list-style: none; padding: 0; display: grid; gap: 6px; font-size: .92rem; }
+.checks li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 6px; }
+.checks .ok { color: var(--go); font-weight: 700; }
+.checks .no { color: var(--ink-3); }
+.why { display: grid; gap: 8px; }
+.sig { display: grid; gap: 3px; font-size: .92rem; }
+.sig .t { display: flex; justify-content: space-between; gap: 10px; font-weight: 700; }
+.fade { height: 6px; background: var(--paper-2); border-radius: 3px; overflow: hidden; }
+.fade i { display: block; height: 100%; background: var(--ink); }
+.opener { border-left: 4px solid var(--sign); padding-left: 12px; font-style: italic; color: var(--ink-2); }
+.notes { list-style: none; padding: 10px 12px; background: var(--paper-2); border-radius: 4px; font-size: .88rem; display: grid; gap: 4px; }
+.stub { border-top: 2px dashed var(--ink); padding: 10px 16px; display: flex; justify-content: space-between; gap: 10px; font-family: var(--f-mono); font-size: .75rem; color: var(--ink-3); }
+
+/* Stack view */
+.tablebox { overflow-x: auto; border-top: 3px solid var(--ink); }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: .95rem; }
+th, td { text-align: left; padding: 14px 12px 14px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--f-sign); font-stretch: 85%; text-transform: uppercase; font-size: .82rem; color: var(--ink-3); font-weight: 700; }
+td b { font-family: var(--f-sign); font-stretch: 88%; font-size: 1.08rem; }
+.role-dot { display: inline-flex; align-items: center; gap: 6px; font-size: .88rem; }
+.role-dot i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.me { background: var(--sign); outline: 2px solid var(--ink); }
+.rs { background: var(--ink); }
+.ge { background: transparent; border: 2px solid var(--ink); }
+.lanes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+@media (max-width: 860px) { .lanes { grid-template-columns: minmax(0, 1fr); } }
+.lane h3 { padding-bottom: 8px; border-bottom: 3px solid var(--ink); margin-bottom: 4px; display: flex; justify-content: space-between; }
+.lane h3 span { font-family: var(--f-mono); font-weight: 400; font-size: .8rem; color: var(--ink-3); }
+.uc { padding: 12px 0; border-bottom: 1px solid var(--rule); display: grid; gap: 4px; }
+.uc b { font-weight: 700; }
+.uc .hrs { font-family: var(--f-mono); font-size: .8rem; color: var(--ink-3); }
+.guard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; }
+@media (max-width: 760px) { .guard { grid-template-columns: minmax(0, 1fr); } }
+.guard div { padding: 14px 0; border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; }
+.guard dt, .guard b { font-family: var(--f-sign); font-stretch: 85%; text-transform: uppercase; font-size: .9rem; }
+
+/* 90 days */
+.legs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; }
+@media (max-width: 860px) { .legs { grid-template-columns: minmax(0, 1fr); } }
+.leg { padding: 20px; display: grid; gap: 10px; align-content: start; background: var(--panel); border-right: 2px solid var(--ink); }
+.leg:last-child { border-right: 0; }
+@media (max-width: 860px) { .leg { border-right: 0; border-bottom: 2px solid var(--ink); } .leg:last-child { border-bottom: 0; } }
+.leg .when { font-family: var(--f-mono); font-size: .8rem; }
+.leg ul { padding-left: 1.1em; display: grid; gap: 6px; color: var(--ink-2); font-size: .95rem; }
+.dash { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 900px) { .dash { grid-template-columns: minmax(0, 1fr); } }
+.funnel { display: grid; gap: 14px; }
+.f-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 64px; gap: 12px; align-items: center; }
+.f-row .lab { font-family: var(--f-sign); font-stretch: 85%; font-weight: 700; text-transform: uppercase; font-size: .9rem; }
+.f-bar { height: 30px; background: var(--paper-2); border-radius: 3px; overflow: hidden; display: flex; }
+.f-bar i { display: block; height: 100%; transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.f-row .v { font-family: var(--f-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.pods { display: flex; gap: 6px; flex-wrap: wrap; }
+.pods button { min-height: 40px; padding: 0 14px; border: 2px solid var(--ink); background: transparent; border-radius: 4px; cursor: pointer; font-family: var(--f-sign); font-weight: 700; font-stretch: 85%; text-transform: uppercase; }
+.pods button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.calc { display: grid; gap: 12px; background: var(--board); color: var(--board-ink); padding: 20px; border-radius: 6px; }
+.calc label { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 10px; align-items: center; font-size: .95rem; }
+.calc input { min-height: 42px; width: 100%; padding: 0 10px; background: var(--flap); color: var(--sign); border: 1px solid var(--flap-line); border-radius: 4px; font-family: var(--f-mono); font-size: 1rem; }
+.calc .out { border-top: 1px solid var(--flap-line); padding-top: 12px; display: grid; gap: 4px; }
+.calc .out b { font-family: var(--f-sign); font-weight: 900; font-stretch: 72%; font-size: 3.4rem; line-height: .95; color: var(--sign); font-variant-numeric: tabular-nums; }
+.calc .small { color: #A9A9A2; }
+details.src summary { cursor: pointer; font-family: var(--f-sign); font-weight: 700; font-stretch: 85%; text-transform: uppercase; min-height: 44px; display: flex; align-items: center; }
+details.src ol { padding-left: 20px; display: grid; gap: 4px; font-size: .92rem; color: var(--ink-2); }
+footer { background: var(--board); color: #A9A9A2; padding-block: 24px; font-size: .85rem; }
+footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+@media (prefers-reduced-motion: reduce) { .flaps.flip i, .blink { animation: none !important; } .moving { display: none; } }
+</style>
+
+<header class="signbar">
+  <div class="wrap">
+    <div class="who"><b>Massimo Mauri</b><span>Revenue Operations Manager · SDR / BDR · Perk</span></div>
+    <nav class="nav" aria-label="Views">
+      <a href="#brief" data-view="brief"><span class="gate">A</span>Brief</a>
+      <a href="#playbook" data-view="playbook"><span class="gate">B</span>Playbook</a>
+      <a href="#board" data-view="board"><span class="gate">C</span>Live board</a>
+      <a href="#stack" data-view="stack"><span class="gate">D</span>Stack &amp; AI</a>
+      <a href="#first90" data-view="first90"><span class="gate">E</span>First 90 days</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<!-- ================= A · BRIEF ================= -->
+<section class="view" data-view="brief">
+  <div class="wrap">
+    <div class="hero">
+      <div class="hero-copy">
+        <span class="kicker"><span class="gate">A</span>Brief</span>
+        <h1>Fewer tabs.<br><span class="hl">More</span> conversations.</h1>
+        <p class="lede">How I would run Perk's SDR and BDR engine, inbound and outbound: the process, the stack, and the automation that gives reps their time back. Below is what the role asks for, matched to what I have already done.</p>
+        <p class="disclaimer">Candidate proposal built on public information. Not affiliated with or endorsed by Perk. Every account on the board is fictional.</p>
+      </div>
+      <div class="board teaser" aria-label="Sample of the live board">
+        <div class="board-head"><span class="board-title"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>Leads departing</span><span class="clock mono" id="clock1">09:00</span></div>
+        <div class="b-row h"><span>Time</span><span>Account</span><span>Pod</span><span>Status</span></div>
+        <div id="teaserRows"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="bigline">The job description lists eleven responsibilities. I have run <mark>every one of them</mark> on an SDR or BDR team, inbound and outbound.</p>
+      <div class="claims" id="claims"></div>
+    </div>
+
+    <div class="section split">
+      <div style="display:grid;gap:14px;align-content:start">
+        <h2>How I work</h2>
+        <p class="lede">Between the business and the tech. I sit with SDR leaders to find where reps lose time or pipeline, write the requirement for Revenue Systems and GTM Engineering, test the tool myself, pilot it with one pod, then scale it with Enablement once the numbers hold.</p>
+      </div>
+      <ol class="rules" style="padding:0;list-style:none">
+        <li class="rule-row"><span class="gate">1</span><div><b>Find the leak</b>Funnel and rep-activity data, plus a ride-along with the reps who feel it.</div></li>
+        <li class="rule-row"><span class="gate">2</span><div><b>Write the requirement</b>A business case, a success metric and an owner, in a form the tech team can build from.</div></li>
+        <li class="rule-row"><span class="gate">3</span><div><b>Try it first-hand</b>I configure and test new tools myself before asking reps to change how they work.</div></li>
+        <li class="rule-row"><span class="gate">4</span><div><b>Pilot, then scale</b>One pod, a control group, a fixed review date. Scale only what beats the baseline.</div></li>
+      </ol>
+    </div>
+    <div class="onward"><a href="#playbook"><span class="gate">B</span>Next: the playbook</a></div>
+  </div>
+</section>
+
+<!-- ================= B · PLAYBOOK ================= -->
+<section class="view" data-view="playbook" hidden>
+  <div class="wrap">
+    <div class="view-head"><span class="kicker"><span class="gate">B</span>Playbook</span><h2>Two lines, one handoff</h2>
+      <p class="lede">Outbound and inbound run on separate lines and meet at qualification. Select a station to see the standard I would set: owner, time limit, rule, what gets automated, and how we measure it.</p></div>
+    <div class="route">
+      <div class="mapbox">
+        <svg viewBox="0 0 760 340" role="group" aria-label="SDR route map" id="map"></svg>
+      </div>
+      <aside class="station" id="station" aria-live="polite"></aside>
+    </div>
+
+    <div class="section">
+      <h2>Qualification ladder</h2>
+      <p class="lede">One set of definitions for every region, agreed with AEs and Marketing. A meeting only counts when the AE accepts it.</p>
+      <div class="ladder">
+        <div class="rung"><b>Target</b><p>In ICP, owned by a pod, not in an open opportunity.</p><span class="exit">Exit: not ICP · duplicate</span></div>
+        <div class="rung"><b>Working</b><p>In a sequence or routed from inbound. First touch logged.</p><span class="exit">Exit: no response after full cadence</span></div>
+        <div class="rung"><b>Engaged</b><p>Two-way conversation with a buyer or influencer.</p><span class="exit">Exit: wrong person · no budget · timing &gt; 12 months</span></div>
+        <div class="rung"><b>Meeting set</b><p>Discovery booked. Pain, role and timing written in the handoff note.</p><span class="exit">Exit: no-show twice</span></div>
+        <div class="rung"><b>AE accepted</b><p>AE confirms within 48 h against five criteria. This is the SDR's number.</p><span class="exit">Exit: rejected with a reason code</span></div>
+      </div>
+    </div>
+
+    <div class="section split">
+      <div style="display:grid;gap:14px;align-content:start">
+        <h2>Rules of engagement</h2>
+        <p class="lede">Who works which account, written down so nobody argues about it on a Friday.</p>
+      </div>
+      <ol class="rules" style="padding:0;list-style:none">
+        <li class="rule-row"><span class="gate">G</span><div><b>Global accounts go to the Global pod</b>2,000+ employees or 6+ countries. Regional SDRs hand over on detection.</div></li>
+        <li class="rule-row"><span class="gate">R</span><div><b>Everyone else follows the region</b>EMEA or North America, by headquarters country.</div></li>
+        <li class="rule-row"><span class="gate">O</span><div><b>Open opportunity wins</b>Outbound signals are paused; the AE gets them as deal intelligence.</div></li>
+        <li class="rule-row"><span class="gate">14</span><div><b>14-day cooldown</b>No new sequence on a contact touched in the last two weeks.</div></li>
+        <li class="rule-row"><span class="gate">48</span><div><b>Conflicts closed in 48 hours</b>Raised in one channel, decided by RevOps on the written rules, logged for the quarterly review.</div></li>
+      </ol>
+    </div>
+
+    <div class="section">
+      <h2>Operating cadence</h2>
+      <p class="lede">The meetings I have designed and run for SDR teams, and the decisions each one exists to make.</p>
+      <div class="cadence">
+        <div class="cad"><h3>Daily <span>15 min</span></h3><ul><li><b>Pod stand-up</b><span>Today's priority accounts, inbound queue, blockers.</span></li><li><b>Inbound SLA check</b><span>Any lead older than 5 minutes gets an owner now.</span></li></ul></div>
+        <div class="cad"><h3>Weekly <span>per pod</span></h3><ul><li><b>1:1 with each SDR</b><span>Two emails and one call reviewed, one thing to change.</span></li><li><b>SDR–AE handoff review</b><span>Accepted vs rejected meetings and the reasons.</span></li><li><b>Pipeline check</b><span>Meetings booked against target by signal.</span></li></ul></div>
+        <div class="cad"><h3>Monthly <span>leaders</span></h3><ul><li><b>Funnel review</b><span>Reply and acceptance by sequence; retire the weakest one.</span></li><li><b>Tool adoption</b><span>Usage, licences, data quality per tool.</span></li><li><b>Pilot read-outs</b><span>Keep, change or stop.</span></li></ul></div>
+        <div class="cad"><h3>Quarterly <span>with Sales, Mktg, Finance</span></h3><ul><li><b>ICP and territories</b><span>Signals, pods and capacity reset.</span></li><li><b>Playbook reissue</b><span>Changelog shared with Enablement.</span></li><li><b>Stack and budget</b><span>Renew, consolidate or cut.</span></li></ul></div>
+      </div>
+    </div>
+    <div class="onward"><a href="#board"><span class="gate">C</span>Next: see it run</a></div>
+  </div>
+</section>
+
+<!-- ================= C · LIVE BOARD ================= -->
+<section class="view" data-view="board" hidden>
+  <div class="wrap">
+    <div class="view-head"><span class="kicker"><span class="gate">C</span>Live board</span><h2>Every lead has a destination</h2>
+      <p class="lede">A tested Python pipeline enriched, scored and routed 14 fictional prospects with the rules from the playbook. Change the rules below and watch the board re-route. Select a lead to see its handoff pass.</p></div>
+    <div class="ctrls">
+      <label for="p1Fit"><span class="top">Minimum fit for a human SDR <output id="p1FitOut"></output></span><input type="range" id="p1Fit" min="50" max="85" step="1" value="65"><small>How well the account matches the ICP</small></label>
+      <label for="p1Tim"><span class="top">Minimum timing score <output id="p1TimOut"></output></span><input type="range" id="p1Tim" min="20" max="60" step="1" value="40"><small>How strong and recent the buying signals are</small></label>
+      <label for="cap"><span class="top">New accounts per pod per day <output id="capOut"></output></span><input type="range" id="cap" min="1" max="4" step="1" value="2"><small>Above this, leads go to the supervised AI SDR</small></label>
+      <button class="btn" type="button" id="resetBtn">Reset</button>
+    </div>
+    <div class="boardwrap">
+      <div>
+        <div class="board main-board">
+          <div class="board-head"><span class="board-title"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>SDR departures</span><span class="clock mono" id="clock2">09:00</span></div>
+          <div class="b-row h"><span>Time</span><span>Account</span><span>Pod</span><span>Tier</span><span>Status</span></div>
+          <div id="rows"></div>
+        </div>
+        <div class="legend-line"><span><b class="st-go mono">BOARDING</b> human SDR</span><span><b class="mono" style="color:var(--ink-2)">AI CREW</b> AI SDR, human-approved</span><span><b class="mono" style="color:var(--ink-2)">TO AE</b> inbound or live deal</span><span><b class="mono" style="color:var(--ink-3)">HOLD / NURTURE / NO GO</b></span></div>
+        <p class="feed" id="feed" aria-live="polite"></p>
+        <div class="totals" id="totals"></div>
+      </div>
+      <aside class="pass" id="pass" aria-live="polite"></aside>
+    </div>
+    <div class="onward"><a href="#stack"><span class="gate">D</span>Next: stack and AI</a></div>
+  </div>
+</section>
+
+<!-- ================= D · STACK & AI ================= -->
+<section class="view" data-view="stack" hidden>
+  <div class="wrap">
+    <div class="view-head"><span class="kicker"><span class="gate">D</span>Stack &amp; AI</span><h2>I own the business case. Systems own the wiring.</h2>
+      <p class="lede">Business owner of every SDR tool, working with Revenue Systems (technical owner) and GTM Engineering (Clay and AI automation). I have used each tool below hands-on.</p></div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:12px" class="small">
+      <span class="role-dot"><i class="me"></i>Business owner (this role)</span><span class="role-dot"><i class="rs"></i>Revenue Systems</span><span class="role-dot"><i class="ge"></i>GTM Engineering</span>
+    </div>
+    <div class="tablebox"><table>
+      <thead><tr><th>Tool</th><th>Job in the SDR flow</th><th>Who does what</th><th>What I track</th></tr></thead>
+      <tbody>
+        <tr><td><b>Salesforce</b><br><span class="small">also HubSpot, Capsule</span></td><td>System of record: leads, accounts, ownership, stages, handoff.</td><td><span class="role-dot"><i class="me"></i>definitions, fields, rules</span><br><span class="role-dot"><i class="rs"></i>config, syncs</span></td><td>Field completeness, duplicate rate, handoff acceptance</td></tr>
+        <tr><td><b>Outreach / Salesloft</b></td><td>Sequences, call tasks, reply handling.</td><td><span class="role-dot"><i class="me"></i>cadence design, governance</span><br><span class="role-dot"><i class="rs"></i>config, sync to CRM</span></td><td>Reply and meeting rate per sequence, deliverability, seat use</td></tr>
+        <tr><td><b>LinkedIn Sales Navigator</b></td><td>Buyer mapping, saved account lists, job-change alerts.</td><td><span class="role-dot"><i class="me"></i>licences, usage standards</span></td><td>Weekly active seats, InMail reply rate, cost per seat</td></tr>
+        <tr><td><b>Apollo</b></td><td>Contact data and verified emails, first layer of the waterfall.</td><td><span class="role-dot"><i class="me"></i>vendor, budget</span><br><span class="role-dot"><i class="ge"></i>waterfall order</span></td><td>Coverage and cost per verified contact, by region</td></tr>
+        <tr><td><b>Clay</b></td><td>Enrichment waterfall, account research, signals, AI columns.</td><td><span class="role-dot"><i class="me"></i>use cases, priorities</span><br><span class="role-dot"><i class="ge"></i>build and run</span></td><td>Hours saved per SDR, meetings per signal, credit spend</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="section">
+      <h2>Automation roadmap</h2>
+      <p class="lede">Use cases I would hand GTM Engineering, ranked by hours returned to SDRs. Every one starts as a pilot with one pod.</p>
+      <div class="lanes">
+        <div class="lane"><h3>Now <span>Q1</span></h3>
+          <div class="uc"><b>Inbound: enrich, score, route in under 5 minutes</b><span class="hrs">metric: form-to-first-touch time</span></div>
+          <div class="uc"><b>Account research brief on every P1 account</b><span class="hrs">≈ 3 h / SDR / week back</span></div>
+          <div class="uc"><b>Auto-log activities and stage changes in the CRM</b><span class="hrs">≈ 1.5 h / SDR / week back</span></div></div>
+        <div class="lane"><h3>Next <span>Q2</span></h3>
+          <div class="uc"><b>Signal-based sequences: new CFO, travel-manager hiring, renewal window</b><span class="hrs">metric: meetings per 100 accounts vs cold lists</span></div>
+          <div class="uc"><b>Reply classification and suggested responses</b><span class="hrs">≈ 1 h / SDR / week back</span></div></div>
+        <div class="lane"><h3>Later <span>Q3+</span></h3>
+          <div class="uc"><b>Supervised AI SDR for overflow and P2 accounts</b><span class="hrs">metric: acceptance rate vs human baseline</span></div>
+          <div class="uc"><b>Weekly learning loop: best openers fed back into templates</b><span class="hrs">metric: reply rate trend</span></div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Guardrails</h2>
+      <dl class="guard">
+        <div><dt>Deliverability</dt><dd>SPF, DKIM and DMARC on every sending domain; spam complaints under 0.3%; daily send caps per mailbox; one-click unsubscribe.</dd></div>
+        <div><dt>Compliance</dt><dd>GDPR legitimate-interest basis documented for EU outbound; opt-outs synced across every tool within a day.</dd></div>
+        <div><dt>Data hygiene</dt><dd>Required fields at each stage, weekly duplicate sweep, one owner per account.</dd></div>
+        <div><dt>Brand</dt><dd>AI-written copy reviewed by a human before it goes into a live sequence; low-confidence drafts go to a queue.</dd></div>
+      </dl>
+    </div>
+    <div class="onward"><a href="#first90"><span class="gate">E</span>Next: first 90 days</a></div>
+  </div>
+</section>
+
+<!-- ================= E · FIRST 90 DAYS ================= -->
+<section class="view" data-view="first90" hidden>
+  <div class="wrap">
+    <div class="view-head"><span class="kicker"><span class="gate">E</span>First 90 days</span><h2>Listen, fix one thing, then scale</h2></div>
+    <div class="legs">
+      <div class="leg"><span class="when">Days 1–30 · Listen</span><h3>Ride along, map, baseline</h3><ul><li>Shadow SDRs in EMEA and North America, inbound and outbound</li><li>Map the current process, tools, licences and costs</li><li>Baseline: speed-to-lead, reply, meeting and acceptance rates by pod</li><li>Agree definitions and rules of engagement with SDR leaders and AEs</li></ul></div>
+      <div class="leg"><span class="when">Days 31–60 · Pilot</span><h3>One pod, two pilots</h3><ul><li>Inbound speed-to-lead routing with Revenue Systems</li><li>Research briefs on P1 accounts with GTM Engineering</li><li>Weekly and monthly cadences running with the new dashboard</li><li>Playbook v1 published with Enablement</li></ul></div>
+      <div class="leg"><span class="when">Days 61–90 · Scale</span><h3>Roll out what worked</h3><ul><li>Scale pilots that beat the control pod; stop the rest</li><li>Stack review: renew, consolidate or cut, with business cases</li><li>Automation roadmap for the next two quarters</li><li>First read-out to Sales leadership in pipeline and hours</li></ul></div>
+    </div>
+
+    <div class="section">
+      <h2>The SDR dashboard</h2>
+      <p class="lede">One source of truth for leaders and reps. Illustrative numbers for one month; the point is the shape: activity is only the top of the funnel, acceptance is the number that matters.</p>
+      <div class="dash">
+        <div style="display:grid;gap:18px">
+          <div class="pods" id="pods" role="group" aria-label="Choose a pod"></div>
+          <div class="funnel" id="funnel"></div>
+          <p class="small" id="funnelNote"></p>
+        </div>
+        <div class="calc" aria-live="polite">
+          <span class="kicker" style="color:var(--sign)">Time back for SDRs</span>
+          <label for="nSdr">SDRs in the team<input id="nSdr" type="number" min="1" value="120"></label>
+          <label for="hSave">Hours saved per SDR per week<input id="hSave" type="number" min="0" step="0.5" value="5.5"></label>
+          <label for="wks">Working weeks per year<input id="wks" type="number" min="1" value="44"></label>
+          <div class="out"><span class="small">Hours returned to prospecting per year</span><b id="outH">0</b><span class="small" id="outFte"></span></div>
+          <span class="small">Assumptions to replace with Perk's real headcount and a time study in month one.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <details class="src"><summary>Sources</summary>
+        <ol>
+          <li><a href="https://www.perk.com/job-application/?ashby_jid=53f196eb-f9b8-48c6-8097-574b43279dcc" target="_blank" rel="noopener">Perk: Revenue Operations Manager, Barcelona (job description)</a></li>
+          <li><a href="https://www.salesforce.com/customer-stories/perk" target="_blank" rel="noopener">Salesforce customer story: Perk and Prospecting Agent</a></li>
+          <li><a href="https://www.perk.com/press-release/perk-brings-award-winning-spend-platform-to-the-us-its-fastest-growing-region/" target="_blank" rel="noopener">Perk brings Spend platform to the US (Sep 2026)</a></li>
+          <li><a href="https://bebop.ai/roles/sdr-playbook" target="_blank" rel="noopener">Bebop: SDR playbook, cadences and compliance limits</a></li>
+          <li><a href="https://www.clay.com/guides/gtm-engineering" target="_blank" rel="noopener">Clay: The Complete Guide to GTM Engineering (2026)</a></li>
+        </ol>
+      </details>
+    </div>
+  </div>
+</section>
+</main>
+<footer><div class="wrap"><span>Massimo Mauri · proposal for the Revenue Operations Manager (SDR) role at Perk</span><span class="mono">pipeline config <span id="cfgv"></span> · tests passing</span></div></footer>
+
+<script id="runData" type="application/json">{"config_version":"2026.11.0","metrics":{"records_in":19,"contact_coverage_pct":100,"verified_email_pct":71,"credits_spent":60.0,"credits_per_verified_contact":6.0,"actions_created":17,"duplicates_skipped":0,"needs_human_review":2,"suppressed_signals":1,"exceptions":[],"manual_minutes_replaced":585,"by_play":{"signal_outbound_sdr":3,"ai_sdr_supervised":4,"no_action":1,"marketing_nurture":3,"deal_signal_to_ae":1,"hold_cooldown":1,"inbound_speed_to_lead":1,"am_cross_sell_spend":2,"am_save_play":2,"am_expansion_watch":1},"runtime_ms":2},"signals_catalog":{"new_finance_leader":{"label":"New CFO / VP Finance"},"hiring_travel_or_ap":{"label":"Hiring travel manager or AP clerk"},"funding_round":{"label":"Raised a funding round"},"new_office_or_country":{"label":"New office or country entry"},"competitor_renewal_window":{"label":"Incumbent T&E contract renews < 6 months"},"intent_spend_mgmt":{"label":"Third-party intent: spend management"},"pricing_page_visit":{"label":"Visited pricing page (known account)"},"demo_request":{"label":"Requested a demo"},"travel_only_high_spend":{"label":"Travel customer, no Spend module, high T&E volume"},"headcount_growth":{"label":"Headcount +20% in 12 months"},"bookings_drop":{"label":"Bookings down > 30% vs prior 90 days"},"champion_left":{"label":"Champion / admin left the company"},"support_escalations":{"label":"3+ support escalations in 30 days"}},"decisions":[{"account":{"id":"ACC-001","name":"Northwind Consulting","region":"EMEA","industry":"Consulting","is_customer":false,"employees":420,"countries":4,"current_tool":"Excel + email","finance_contact":{"name":"Grace Bianchi","title":"CFO","email":"grace.bianchi@northwind-consulting.example","email_status":"valid"}},"pod":"EMEA","play":"signal_outbound_sdr","scores":{"fit":83,"timing":49,"active_signals":[{"type":"new_finance_leader","label":"New CFO / VP Finance","days_ago":12,"evidence":"New CFO announced on LinkedIn, ex-Big Four","weight":27.4,"strength":30},{"type":"hiring_travel_or_ap","label":"Hiring travel manager or AP clerk","days_ago":9,"evidence":"Job post: 'Travel & Expense Coordinator', Madrid","weight":21.8,"strength":25}],"suppressed_signals":[]},"brief":{"opener":"Hi Grace, I noticed: New CFO announced on LinkedIn, ex-Big Four. Companies at Northwind Consulting's stage usually hit the point where travel and expenses outgrow Excel + email. Worth 20 minutes?","confidence":0.85,"needs_review":false}},{"account":{"id":"ACC-002","name":"Brightwave Engineering","region":"EMEA","industry":"Engineering","is_customer":false,"employees":1150,"countries":6,"current_tool":"SAP Concur","finance_contact":{"name":"Lucia Haugen","title":"CFO","email":"lucia.haugen@brightwave-eng.example","email_status":"catch_all"}},"pod":"Global","play":"signal_outbound_sdr","scores":{"fit":82,"timing":43,"active_signals":[{"type":"competitor_renewal_window","label":"Incumbent T&E contract renews < 6 months","days_ago":20,"evidence":"Concur contract renews March 2027 (rep note)","weight":27.8,"strength":35},{"type":"pricing_page_visit","label":"Visited pricing page (known account)","days_ago":2,"evidence":"3 visits to /pricing from Munich IP range","weight":14.8,"strength":18}],"suppressed_signals":[]},"brief":{"opener":"Hi Lucia, I noticed: Concur contract renews March 2027 (rep note). Companies at Brightwave Engineering's stage usually hit the point where travel and expenses outgrow SAP Concur. Worth 20 minutes?","confidence":0.7,"needs_review":false}},{"account":{"id":"ACC-003","name":"Lumen Biotech","region":"EMEA","industry":"Pharma","is_customer":false,"employees":1300,"countries":8,"current_tool":"Expensify","finance_contact":{"name":"Mei Martin","title":"VP Finance","email":"mei.martin@lumen-bio.example","email_status":"valid"}},"pod":"Global","play":"ai_sdr_supervised","scores":{"fit":82,"timing":33,"active_signals":[{"type":"new_office_or_country","label":"New office or country entry","days_ago":30,"evidence":"Opening Boston office Q1 2027","weight":18.5,"strength":22},{"type":"funding_round","label":"Raised a funding round","days_ago":25,"evidence":"Series C, EUR 80M","weight":15.0,"strength":20}],"suppressed_signals":[]},"brief":{"opener":"Hi Mei, I noticed: Opening Boston office Q1 2027. Companies at Lumen Biotech's stage usually hit the point where travel and expenses outgrow Expensify. Worth 20 minutes?","confidence":0.85,"needs_review":false}},{"account":{"id":"ACC-004","name":"Cobalt Retail Group","region":"EMEA","industry":"Retail","is_customer":false,"employees":6500,"countries":2,"current_tool":"SAP Concur","finance_contact":{"name":"Hannah Haugen","title":"VP Finance","email":"hannah.haugen@cobalt-retail.example","email_status":"valid"}},"pod":"Global","play":"no_action","scores":{"fit":30,"timing":12,"active_signals":[{"type":"intent_spend_mgmt","label":"Third-party intent: spend management","days_ago":6,"evidence":"Surging on 'corporate card' topic cluster","weight":12.3,"strength":15}],"suppressed_signals":[]},"brief":{"opener":"Hi Hannah, I noticed: Surging on 'corporate card' topic cluster. Companies at Cobalt Retail Group's stage usually hit the point where travel and expenses outgrow SAP Concur. Worth 20 minutes?","confidence":0.75,"needs_review":false}},{"account":{"id":"ACC-005","name":"Atlas Field Services","region":"EMEA","industry":"Construction","is_customer":false,"employees":850,"countries":3,"current_tool":"None (paper receipts)","finance_contact":{"name":"Grace Bianchi","title":"VP Finance","email":"grace.bianchi@atlas-field.example","email_status":"valid"}},"pod":"EMEA","play":"signal_outbound_sdr","scores":{"fit":83,"timing":46,"active_signals":[{"type":"hiring_travel_or_ap","label":"Hiring travel manager or AP clerk","days_ago":15,"evidence":"Hiring 2 AP clerks, Manchester","weight":19.8,"strength":25},{"type":"pricing_page_visit","label":"Visited pricing page (known account)","days_ago":3,"evidence":"Pricing + integrations pages, 2 visitors","weight":13.4,"strength":18},{"type":"intent_spend_mgmt","label":"Third-party intent: spend management","days_ago":4,"evidence":"Surging on 'expense automation'","weight":13.1,"strength":15}],"suppressed_signals":[]},"brief":{"opener":"Hi Grace, I noticed: Hiring 2 AP clerks, Manchester. Companies at Atlas Field Services's stage usually hit the point where travel and expenses outgrow None (paper receipts). Worth 20 minutes?","confidence":0.9,"needs_review":false}},{"account":{"id":"ACC-006","name":"Quillon Media","region":"EMEA","industry":"Media & Events","is_customer":false,"employees":380,"countries":5,"current_tool":"TravelPerk competitor (Navan)","finance_contact":{"name":"Mei Hughes","title":"VP Finance","email":"mei.hughes@quillon-media.example","email_status":"valid"}},"pod":"EMEA","play":"marketing_nurture","scores":{"fit":74,"timing":17,"active_signals":[{"type":"new_finance_leader","label":"New CFO / VP Finance","days_ago":70,"evidence":"New VP Finance, 10 weeks ago","weight":17.5,"strength":30}],"suppressed_signals":[]},"brief":{"opener":"Hi Mei, I noticed: New VP Finance, 10 weeks ago. Companies at Quillon Media's stage usually hit the point where travel and expenses outgrow TravelPerk competitor (Navan). Worth 20 minutes?","confidence":0.75,"needs_review":false}},{"account":{"id":"ACC-007","name":"Helios Energy Partners","region":"EMEA","industry":"Energy","is_customer":false,"employees":2100,"countries":7,"current_tool":"Excel + email","open_opportunity":true,"finance_contact":{"name":"Tomas Hughes","title":"Head of Finance Operations","email":"tomas.hughes@helios-energy.example","email_status":"valid"}},"pod":"Global","play":"deal_signal_to_ae","scores":{"fit":82,"timing":16,"active_signals":[{"type":"pricing_page_visit","label":"Visited pricing page (known account)","days_ago":1,"evidence":"Pricing page, 4 visits","weight":16.3,"strength":18}],"suppressed_signals":[{"type":"new_finance_leader"}]},"brief":{"opener":"Hi Tomas, I noticed: Pricing page, 4 visits. Companies at Helios Energy Partners's stage usually hit the point where travel and expenses outgrow Excel + email. Worth 20 minutes?","confidence":0.75,"needs_review":false}},{"account":{"id":"ACC-008","name":"Pinecrest Software","region":"EMEA","industry":"Software","is_customer":false,"employees":260,"countries":3,"current_tool":"Expensify","last_contacted_days":6,"finance_contact":{"name":"Jonas Bianchi","title":"Controller","email":"jonas.bianchi@pinecrest.example","email_status":"catch_all"}},"pod":"EMEA","play":"hold_cooldown","scores":{"fit":75,"timing":18,"active_signals":[{"type":"funding_round","label":"Raised a funding round","days_ago":10,"evidence":"Series B, USD 40M","weight":17.8,"strength":20}],"suppressed_signals":[]},"brief":{"opener":"Hi Jonas, I noticed: Series B, USD 40M. Companies at Pinecrest Software's stage usually hit the point where travel and expenses outgrow Expensify. Worth 20 minutes?","confidence":0.6,"needs_review":true}},{"account":{"id":"ACC-009","name":"Redline Logistics","region":"NA","industry":"Logistics","is_customer":false,"employees":1600,"countries":2,"current_tool":"SAP Concur","finance_contact":{"name":"Amara Becker","title":"VP Finance","email":"amara.becker@redline-logistics.example","email_status":"catch_all"}},"pod":"NA","play":"ai_sdr_supervised","scores":{"fit":59,"timing":41,"active_signals":[{"type":"competitor_renewal_window","label":"Incumbent T&E contract renews < 6 months","days_ago":35,"evidence":"Concur renewal June 2027","weight":23.4,"strength":35},{"type":"new_office_or_country","label":"New office or country entry","days_ago":40,"evidence":"New hub in Toronto","weight":17.5,"strength":22}],"suppressed_signals":[]},"brief":{"opener":"Hi Amara, I noticed: Concur renewal June 2027. Companies at Redline Logistics's stage usually hit the point where travel and expenses outgrow SAP Concur. Worth 20 minutes?","confidence":0.7,"needs_review":false}},{"account":{"id":"ACC-010","name":"Summit Health Analytics","region":"NA","industry":"Software","is_customer":false,"employees":950,"countries":1,"current_tool":"Ramp (cards only)","finance_contact":{"name":"Elena Navarro","title":"Finance Director","email":"elena.navarro@summit-health.example","email_status":"valid"}},"pod":"NA","play":"ai_sdr_supervised","scores":{"fit":55,"timing":40,"active_signals":[{"type":"hiring_travel_or_ap","label":"Hiring travel manager or AP clerk","days_ago":3,"evidence":"Job post: 'Corporate Travel Manager'","weight":23.9,"strength":25},{"type":"funding_round","label":"Raised a funding round","days_ago":18,"evidence":"Series D, USD 120M","weight":16.2,"strength":20}],"suppressed_signals":[]},"brief":{"opener":"Hi Elena, I noticed: Job post: 'Corporate Travel Manager'. Companies at Summit Health Analytics's stage usually hit the point where travel and expenses outgrow Ramp (cards only). Worth 20 minutes?","confidence":0.85,"needs_review":false}},{"account":{"id":"ACC-011","name":"Granite & Co Builders","region":"NA","industry":"Construction","is_customer":false,"employees":3200,"countries":1,"current_tool":"None (paper receipts)","finance_contact":{"name":"Ines Moreau","title":"Head of Finance Operations","email":"ines.moreau@granite-builders.example","email_status":"valid"}},"pod":"Global","play":"marketing_nurture","scores":{"fit":55,"timing":6,"active_signals":[{"type":"intent_spend_mgmt","label":"Third-party intent: spend management","days_ago":30,"evidence":"Intent faded, last surge a month ago","weight":5.6,"strength":15}],"suppressed_signals":[]},"brief":{"opener":"Hi Ines, I noticed: Intent faded, last surge a month ago. Companies at Granite & Co Builders's stage usually hit the point where travel and expenses outgrow None (paper receipts). Worth 20 minutes?","confidence":0.75,"needs_review":false}},{"account":{"id":"ACC-012","name":"Vantage Clinical","region":"NA","industry":"Pharma","is_customer":false,"employees":700,"countries":4,"current_tool":"Excel + email","finance_contact":{"name":"Elena Haugen","title":"VP Finance","email":"elena.haugen@vantage-clinical.example","email_status":"valid"}},"pod":"NA","play":"ai_sdr_supervised","scores":{"fit":83,"timing":26,"active_signals":[{"type":"new_finance_leader","label":"New CFO / VP Finance","days_ago":20,"evidence":"New VP Finance from a Perk customer","weight":25.7,"strength":30}],"suppressed_signals":[]},"brief":{"opener":"Hi Elena, I noticed: New VP Finance from a Perk customer. Companies at Vantage Clinical's stage usually hit the point where travel and expenses outgrow Excel + email. Worth 20 minutes?","confidence":0.75,"needs_review":false}},{"account":{"id":"ACC-013","name":"Bluebird Cafes","region":"NA","industry":"Hospitality","is_customer":false,"employees":90,"countries":1,"current_tool":"None","finance_contact":{"name":"Pieter Navarro","title":"Head of Finance Operations","email":"pieter.navarro@bluebird-cafes.example","email_status":"invalid"}},"pod":"NA","play":"marketing_nurture","scores":{"fit":40,"timing":11,"active_signals":[{"type":"funding_round","label":"Raised a funding round","days_ago":50,"evidence":"Seed round","weight":11.2,"strength":20}],"suppressed_signals":[]},"brief":{"opener":"Hi Pieter, I noticed: Seed round. Companies at Bluebird Cafes's stage usually hit the point where travel and expenses outgrow None. Worth 20 minutes?","confidence":0.45,"needs_review":true}},{"account":{"id":"ACC-014","name":"Orbit Data Systems","region":"NA","industry":"Software","is_customer":false,"employees":540,"countries":3,"current_tool":"Expensify","finance_contact":{"name":"Jonas Okafor","title":"Head of Finance Operations","email":"jonas.okafor@orbit-data.example","email_status":"valid"}},"pod":"NA","play":"inbound_speed_to_lead","scores":{"fit":75,"timing":60,"active_signals":[{"type":"demo_request","label":"Requested a demo","days_ago":0,"evidence":"Demo form: 'Need travel + expenses in one tool, 3 offices'","weight":60.0,"strength":60}],"suppressed_signals":[]},"brief":{"opener":"Hi Jonas, I noticed: Demo form: 'Need travel + expenses in one tool, 3 offices'. Companies at Orbit Data Systems's stage usually hit the point where travel and expenses outgrow Expensify. Worth 20 minutes?","confidence":0.75,"needs_review":false}}]}</script>
+<script>
+const RUN = JSON.parse(document.getElementById('runData').textContent);
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+$('#cfgv').textContent = RUN.config_version;
+const PROS = RUN.decisions.filter(d => !d.account.is_customer);
+
+/* ---------- routing ---------- */
+const VIEWS = ['brief', 'playbook', 'board', 'stack', 'first90'];
+function route() {
+  const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'brief';
+  document.querySelectorAll('.view').forEach(s => s.hidden = s.dataset.view !== v);
+  document.querySelectorAll('.nav a').forEach(a => a.dataset.view === v ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+  window.scrollTo(0, 0);
+  if (v === 'brief') stampObserve();
+  if (v === 'board') renderBoard(true);
+}
+
+/* ---------- split-flap helper ---------- */
+function flaps(text, cls = '', animate = true, base = 0) {
+  const chars = [...String(text).toUpperCase()];
+  return `<span class="flaps ${cls} ${animate && !RM ? 'flip' : ''}" aria-label="${esc(text)}">${chars.map((c, i) => `<i style="--d:${base + i * 35}ms">${c === ' ' ? '&nbsp;' : esc(c)}</i>`).join('')}</span>`;
+}
+function tickClock() {
+  const d = new Date(); const t = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  ['clock1', 'clock2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = t; });
+}
+tickClock(); setInterval(tickClock, 15000);
+
+/* ---------- decision logic (ported from gtm/routing.py) ---------- */
+const DEFAULTS = { p1Fit: 65, p1Tim: 40, cap: 2 };
+const STATUS = {
+  signal_outbound_sdr: ['Boarding', 'st-go', 'Human SDR, signal-based sequence'],
+  ai_sdr_supervised: ['AI crew', 'st-ai', 'Supervised AI SDR, human approves'],
+  inbound_speed_to_lead: ['To AE now', 'st-ae', 'Inbound: book the meeting on the spot'],
+  deal_signal_to_ae: ['To AE', 'st-ae', 'Open opportunity: signal goes to the deal owner'],
+  hold_cooldown: ['Hold', 'st-hold', 'Contacted in the last 14 days'],
+  marketing_nurture: ['Nurture', 'st-hold', 'Marketing nurture until timing improves'],
+  no_action: ['No go', 'st-x', 'Out of ICP: no action'],
+};
+function tierOf(fit, t, p) { if (fit >= p.p1Fit && t >= p.p1Tim) return 'P1'; if (fit >= 55 && t >= 25) return 'P2'; if (fit >= 40) return 'P3'; return 'P4'; }
+function playOf(acc, types, tier) {
+  if (types.has('demo_request')) return 'inbound_speed_to_lead';
+  if (acc.open_opportunity) return 'deal_signal_to_ae';
+  if (acc.last_contacted_days != null && acc.last_contacted_days < 14) return 'hold_cooldown';
+  return { P1: 'signal_outbound_sdr', P2: 'ai_sdr_supervised', P3: 'marketing_nurture' }[tier] || 'no_action';
+}
+function decide(p) {
+  const rows = PROS.map(d => {
+    const s = d.scores, tier = tierOf(s.fit, s.timing, p);
+    return { d, tier, priority: Math.round(0.55 * s.fit + 0.45 * s.timing), play: playOf(d.account, new Set(s.active_signals.map(x => x.type)), tier), notes: [] };
+  });
+  const used = {};
+  [...rows].sort((a, b) => b.priority - a.priority).forEach(r => {
+    if (r.play !== 'signal_outbound_sdr') return;
+    used[r.d.pod] = (used[r.d.pod] || 0) + 1;
+    if (used[r.d.pod] > p.cap) { r.play = 'ai_sdr_supervised'; r.notes.push(`${r.d.pod} pod is full today, so this lead overflows to the supervised AI SDR.`); }
+  });
+  rows.sort((a, b) => b.priority - a.priority);
+  rows.forEach((r, i) => { const m = 9 * 60 + i * 7; r.time = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; });
+  return rows;
+}
+
+/* ---------- A · teaser + claims ---------- */
+function teaser() {
+  const rows = decide(DEFAULTS).slice(0, 5);
+  $('#teaserRows').innerHTML = rows.map((r, i) => { const [st, cls] = STATUS[r.play];
+    return `<div class="b-row"><span>${flaps(r.time, '', true, i * 180)}</span><span class="acct-cell"><b>${esc(r.d.account.name)}</b><span>${esc(r.d.scores.active_signals[0]?.label || '')}</span></span><span>${flaps(r.d.pod, 'y', true, i * 180 + 120)}</span><span class="status ${cls} ${i === 0 ? 'blink' : ''}">${st}</span></div>`; }).join('');
+}
+const CLAIMS = [
+  ['Strategic partner to SDR leadership: operating model, territories, handoffs', 'Designed the operating model for SDR/BDR teams: pod structure, territories and the SDR-to-AE handoff.', []],
+  ['Weekly, monthly and quarterly cadences', 'Designed and ran the team rhythm: stand-ups, one-to-ones, weekly pipeline reviews, monthly and quarterly development and planning cycles.', []],
+  ['Own the end-to-end SDR process, documented in playbooks', 'Ran prospecting, outreach, qualification and handoff end to end, inbound and outbound, and wrote the playbooks reps worked from.', []],
+  ['ICP, account prioritisation and signal-based targeting', 'Defined the ideal customer profile and built signal-based targeting to decide who to contact first.', ['Clay', 'Sales Navigator', 'Apollo']],
+  ['Qualification methodology and acceptance standards', 'Set lead and meeting definitions, qualification criteria and disqualification reasons agreed with AEs.', []],
+  ['Inbound lead process: routing, speed-to-lead, ownership', 'Owned inbound capture, routing and follow-up standards between Marketing and SDRs.', ['Salesforce', 'HubSpot']],
+  ['Rules of engagement between SDRs, AEs and Marketing', 'Wrote account ownership rules and resolved conflicts between teams.', []],
+  ['Business owner of the SDR tech stack', 'Chose, rolled out and ran the tools reps prospect with, and the CRMs behind them.', ['Outreach', 'Salesloft', 'Apollo', 'Clay', 'Sales Navigator', 'Salesforce', 'HubSpot', 'Capsule']],
+  ['Translate business needs into requirements for Systems and GTM Engineering', 'Turned SDR leaders\' problems into requirements for tech teams, and tested new tools hands-on before rollout.', []],
+  ['Reduce manual work with AI and automation; measure time saved', 'Designed processes that automated research, CRM updates and follow-up, giving reps time back for selling.', []],
+  ['Pilot emerging AI and scale what works', 'Ran pilots and scaled the ones that worked across the team to hit targets.', []],
+];
+$('#claims').innerHTML = CLAIMS.map(([ask, did, tools], i) => `<div class="claim in" style="--d:${i * 70}ms"><div class="ask">${esc(ask)}</div><div class="did">${esc(did)}${tools.length ? `<div class="tools">${tools.map(t => `<span class="tool">${esc(t)}</span>`).join('')}</div>` : ''}</div><span class="stamp">Done it</span></div>`).join('');
+let io;
+function stampObserve() {
+  if (io || !('IntersectionObserver' in window)) { document.querySelectorAll('.claim').forEach(c => c.classList.add('seen')); return; }
+  io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('seen'); io.unobserve(e.target); } }), { threshold: .4 });
+  document.querySelectorAll('.claim').forEach(c => io.observe(c));
+}
+
+/* ---------- B · route map ---------- */
+const STATIONS = [
+  { id: 'sig', line: 'out', x: 110, y: 70, name: 'Signal', sub: 'new CFO, hiring, renewal', owner: 'GTM Eng builds, RevOps prioritises', sla: 'Act within 7 days of the signal', rule: 'Fit and timing scored separately; only high fit plus fresh timing goes to a human SDR.', auto: 'Clay signal tables, decayed timing score', metric: 'Meetings per 100 accounts, by signal' },
+  { id: 'res', line: 'out', x: 245, y: 70, name: 'Research', sub: 'buyer + why now', owner: 'SDR, with an AI brief', sla: 'Brief ready before first touch', rule: 'Every P1 account gets a one-page brief: why now, angle, buyer, opener.', auto: 'Research agent; low-confidence briefs go to review', metric: 'Research time per account' },
+  { id: 'seq', line: 'out', x: 380, y: 70, name: 'Sequence', sub: '14 days, 4 channels', owner: 'SDR', sla: 'First touch within 24 h of assignment', rule: 'Signal-specific cadence: email, call, LinkedIn. Stops on reply, meeting or opt-out.', auto: 'Outreach / Salesloft; tasks auto-created', metric: 'Reply and meeting rate per sequence' },
+  { id: 'form', line: 'in', x: 110, y: 260, name: 'Inbound', sub: 'demo, pricing, chat', owner: 'Marketing hands to SDR', sla: 'Captured instantly', rule: 'Every form creates or matches a CRM record; no orphan leads.', auto: 'Form to CRM sync, duplicate check', metric: 'Leads captured vs submitted' },
+  { id: 'score', line: 'in', x: 245, y: 260, name: 'Enrich + score', sub: 'waterfall, ICP', owner: 'RevOps rules, Systems runs', sla: 'Under 1 minute', rule: 'Enrich missing fields, apply ICP fit, apply rules of engagement.', auto: 'Waterfall enrichment, fit scoring', metric: 'Enrichment coverage' },
+  { id: 'route', line: 'in', x: 380, y: 260, name: 'Route', sub: 'speed-to-lead', owner: 'SDR on rotation, by pod', sla: 'First touch in 5 minutes', rule: 'Round-robin inside the owning pod; book on the spot when fit is high.', auto: 'Routing rules, instant scheduler', metric: 'Form-to-first-touch time' },
+  { id: 'qual', line: 'both', x: 560, y: 165, name: 'Qualify', sub: 'meeting set', owner: 'SDR', sla: 'Handoff note within 2 h', rule: 'Five criteria: ICP fit, pain, role, timing, next step agreed.', auto: 'Call notes summarised into the handoff fields', metric: 'Meetings set' },
+  { id: 'ae', line: 'both', x: 695, y: 165, name: 'AE accepts', sub: 'within 48 h', owner: 'AE, reviewed weekly with SDR leader', sla: 'Accept or reject in 48 h', rule: 'Rejections need a reason code; reviewed every week.', auto: 'Acceptance task and reminder', metric: 'AE acceptance rate (the SDR number)' },
+];
+function drawMap() {
+  const ink = 'var(--ink)', y = 'var(--sign)';
+  const S = Object.fromEntries(STATIONS.map(s => [s.id, s]));
+  const pOut = `M${S.sig.x},${S.sig.y} H${S.seq.x} C 470,70 470,165 ${S.qual.x},${S.qual.y} H${S.ae.x}`;
+  const pIn = `M${S.form.x},${S.form.y} H${S.route.x} C 470,260 470,165 ${S.qual.x},${S.qual.y}`;
+  let svg = `<path d="${pOut}" fill="none" stroke="${y}" stroke-width="14" stroke-linecap="round"/>
+    <path d="${pIn}" fill="none" stroke="${ink}" stroke-width="14" stroke-linecap="round"/>
+    <path d="M${S.qual.x},${S.qual.y} H${S.ae.x}" fill="none" stroke="${ink}" stroke-width="14" stroke-dasharray="0 0"/>
+    <path d="M${S.qual.x},${S.qual.y - 5} H${S.ae.x}" fill="none" stroke="${y}" stroke-width="5"/>
+    <text x="540" y="50" style="font-family:var(--f-mono);font-size:12px;fill:var(--ink-3)">OUTBOUND LINE</text>
+    <text x="540" y="290" style="font-family:var(--f-mono);font-size:12px;fill:var(--ink-3)">INBOUND LINE</text>`;
+  if (!RM) svg += `<circle r="7" fill="var(--ink)" class="moving"><animateMotion dur="7s" repeatCount="indefinite" path="${pOut}"/></circle>
+    <circle r="7" fill="var(--sign)" stroke="var(--ink)" stroke-width="2" class="moving"><animateMotion dur="5s" begin="1.5s" repeatCount="indefinite" path="${pIn}"/></circle>`;
+  svg += STATIONS.map(s => { const below = s.line === 'in' || s.id === 'qual' || s.id === 'ae';
+    const ty = below ? s.y + 34 : s.y - 36;
+    return `<g class="st" tabindex="0" role="button" aria-pressed="false" data-id="${s.id}" aria-label="${esc(s.name)}">
+      <circle cx="${s.x}" cy="${s.y}" r="11"/><text x="${s.x}" y="${ty}" text-anchor="middle">${esc(s.name)}</text><text class="sub" x="${s.x}" y="${ty + 15}" text-anchor="middle">${esc(s.sub)}</text></g>`; }).join('');
+  $('#map').innerHTML = svg;
+  document.querySelectorAll('.st').forEach(g => { g.addEventListener('click', () => station(g.dataset.id)); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); station(g.dataset.id); } }); });
+}
+function station(id) {
+  const s = STATIONS.find(x => x.id === id);
+  document.querySelectorAll('.st').forEach(g => g.setAttribute('aria-pressed', String(g.dataset.id === id)));
+  const tag = { out: ['var(--sign)', 'Outbound line'], in: ['var(--ink)', 'Inbound line'], both: ['linear-gradient(90deg,var(--ink) 50%,var(--sign) 50%)', 'Both lines'] }[s.line];
+  $('#station').innerHTML = `<span class="line-tag"><i style="background:${tag[0]}"></i>${tag[1]}</span><h3 style="font-size:1.8rem;text-transform:uppercase;font-stretch:78%;font-weight:800">${esc(s.name)}</h3>
+    <dl><dt>Owner</dt><dd>${esc(s.owner)}</dd><dt>Time limit</dt><dd><b>${esc(s.sla)}</b></dd><dt>Standard</dt><dd>${esc(s.rule)}</dd><dt>Automated</dt><dd>${esc(s.auto)}</dd><dt>Measured by</dt><dd>${esc(s.metric)}</dd></dl>`;
+}
+drawMap(); station('route');
+
+/* ---------- C · board ---------- */
+const ctl = { p1Fit: $('#p1Fit'), p1Tim: $('#p1Tim'), cap: $('#cap') };
+let selected = 'ACC-001', last = {};
+const params = () => ({ p1Fit: +ctl.p1Fit.value, p1Tim: +ctl.p1Tim.value, cap: +ctl.cap.value });
+function renderBoard(first = false) {
+  const p = params();
+  $('#p1FitOut').textContent = p.p1Fit; $('#p1TimOut').textContent = p.p1Tim; $('#capOut').textContent = p.cap;
+  const rows = decide(p);
+  const moved = [];
+  $('#rows').innerHTML = rows.map((r, i) => {
+    const a = r.d.account, [st, cls] = STATUS[r.play];
+    const changed = !first && last[a.id] && last[a.id] !== r.play;
+    if (changed) moved.push(`${a.name} → ${st}`);
+    const anim = first || changed;
+    return `<button type="button" class="b-row" data-id="${a.id}" aria-pressed="${a.id === selected}">
+      <span>${flaps(r.time, '', first, i * 60)}</span>
+      <span class="acct-cell"><b>${esc(a.name)}</b><span>${esc(r.d.scores.active_signals[0]?.label || 'No active signal')}</span></span>
+      <span>${flaps(r.d.pod, 'y', first, i * 60 + 80)}</span>
+      <span>${flaps(r.tier, '', anim, i * 60 + 140)}</span>
+      <span class="status ${cls}">${anim ? flaps(st, '', true, first ? i * 60 + 180 : 0) : esc(st)}</span></button>`;
+  }).join('');
+  last = Object.fromEntries(rows.map(r => [r.d.account.id, r.play]));
+  document.querySelectorAll('#rows .b-row').forEach(b => b.addEventListener('click', () => { selected = b.dataset.id; document.querySelectorAll('#rows .b-row').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.id === selected))); renderPass(rows); }));
+  const diff = rows.filter(r => r.play !== r.d.play).length;
+  $('#feed').textContent = moved.length ? `Re-routed: ${moved.join(' · ')}` : (diff ? `${diff} of ${rows.length} leads differ from the Python reference run.` : `All ${rows.length} destinations match the Python reference run.`);
+  const c = k => rows.filter(r => r.play === k).length;
+  const m = RUN.metrics;
+  $('#totals').innerHTML = [[c('signal_outbound_sdr'), 'to human SDRs'], [c('ai_sdr_supervised'), 'to the AI SDR'], [c('inbound_speed_to_lead') + c('deal_signal_to_ae'), 'straight to AEs'],
+    [`${m.verified_email_pct}%`, 'verified buyer emails'], [`${Math.round(m.manual_minutes_replaced / 60)} h`, 'manual research replaced']]
+    .map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
+  renderPass(rows);
+}
+function renderPass(rows) {
+  const r = rows.find(x => x.d.account.id === selected) || rows[0];
+  const { account: a, scores: s, brief: b } = r.d, [st, , what] = STATUS[r.play];
+  const notes = [...r.notes];
+  s.suppressed_signals.forEach(x => notes.push(`"${RUN.signals_catalog[x.type].label}" paused: an opportunity is already open.`));
+  if (a.last_contacted_days != null && a.last_contacted_days < 14) notes.push(`Touched ${a.last_contacted_days} days ago: inside the 14-day cooldown.`);
+  const to = { signal_outbound_sdr: 'SDR', ai_sdr_supervised: 'AI', inbound_speed_to_lead: 'AE', deal_signal_to_ae: 'AE', hold_cooldown: 'HLD', marketing_nurture: 'MKT', no_action: '—' }[r.play];
+  const c = a.finance_contact;
+  const crit = [['ICP fit', s.fit >= 60], ['Buying signal in the last 90 days', s.active_signals.some(x => x.days_ago <= 90)], ['Buyer identified', !!c], ['Verified email', c?.email_status === 'valid'], ['Not owned by an open deal', !a.open_opportunity]];
+  $('#pass').innerHTML = `<div class="pass-top"><span>Handoff pass</span><span class="mono" style="font-weight:500">${esc(a.id)}</span></div>
+    <div class="pass-body">
+      <div class="pass-route"><div><span class="lbl">From</span><div class="code">${esc(r.d.pod === 'Global' ? 'GLB' : r.d.pod)}</div></div>
+        <svg class="plane" width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" transform="rotate(90 12 12)"/></svg>
+        <div style="text-align:right"><span class="lbl">To</span><div class="code">${to}</div></div></div>
+      <div><h3>${esc(a.name)}</h3><p class="small">${esc(a.industry)} · ${a.employees ? a.employees.toLocaleString('en') + ' people' : 'size unknown'} · ${a.countries} countries · today: ${esc(a.current_tool)}</p></div>
+      <div class="pass-grid"><div><span>Status</span><b>${esc(st)}</b></div><div><span>Tier</span><b>${r.tier}</b></div><div><span>Fit / timing</span><b>${s.fit} / ${s.timing}</b></div></div>
+      <p><b>${esc(what)}.</b></p>
+      ${notes.length ? `<ul class="notes">${notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
+      <div class="why"><span class="kicker" style="font-size:.85rem">Why now</span>${s.active_signals.length ? s.active_signals.map(x => `<div class="sig"><span class="t"><span>${esc(x.label)}</span><span class="mono">${x.days_ago}d</span></span><div class="fade" title="Signal strength left after decay"><i style="width:${Math.round(100 * x.weight / x.strength)}%"></i></div><span class="small">${esc(x.evidence)}</span></div>`).join('') : '<p class="small">No active signal.</p>'}</div>
+      <div class="why"><span class="kicker" style="font-size:.85rem">Boarding checks</span><ul class="checks">${crit.map(([l, ok]) => `<li><span class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '–'}</span><span>${esc(l)}</span></li>`).join('')}</ul></div>
+      ${c ? `<div class="why"><span class="kicker" style="font-size:.85rem">Buyer and opener</span><p>${esc(c.name)}, ${esc(c.title)}</p><p class="opener">${esc(b.opener)}</p></div>` : ''}
+    </div>
+    <div class="stub"><span>brief confidence ${b.confidence}${b.needs_review ? ' · human review' : ''}</span><span>${esc(r.time)}</span></div>`;
+}
+Object.values(ctl).forEach(el => el.addEventListener('input', () => renderBoard(false)));
+$('#resetBtn').addEventListener('click', () => { Object.entries(DEFAULTS).forEach(([k, v]) => ctl[k].value = v); renderBoard(false); });
+
+/* ---------- E · funnel + calculator ---------- */
+const FUN = { All: [4200, 520, 168, 131], EMEA: [1900, 250, 82, 66], NA: [1500, 170, 54, 39], Global: [800, 100, 32, 26] };
+const STAGES = ['Contacted', 'Replied', 'Meetings set', 'AE accepted'];
+let pod = 'All';
+$('#pods').innerHTML = Object.keys(FUN).map(k => `<button type="button" data-p="${k}" aria-pressed="${k === pod}">${k}</button>`).join('');
+$('#pods').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { pod = b.dataset.p; $('#pods').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.p === pod))); funnel(); }));
+function funnel() {
+  const v = FUN[pod], max = v[0];
+  $('#funnel').innerHTML = v.map((n, i) => `<div class="f-row"><span class="lab">${STAGES[i]}</span><div class="f-bar"><i style="width:${Math.max(2, 100 * n / max)}%;background:${i === 3 ? 'var(--sign)' : 'var(--ink)'}"></i></div><span class="v">${n.toLocaleString('en')}</span></div>`).join('');
+  $('#funnelNote').textContent = `Meeting-to-acceptance ${Math.round(100 * v[3] / v[2])}% · acceptance per 100 contacted ${(100 * v[3] / v[0]).toFixed(1)} · median inbound speed-to-lead target: under 5 minutes`;
+}
+funnel();
+function calc() {
+  const n = Math.max(0, +$('#nSdr').value || 0), h = Math.max(0, +$('#hSave').value || 0), w = Math.max(0, +$('#wks').value || 0);
+  const tot = n * h * w; $('#outH').textContent = Math.round(tot).toLocaleString('en');
+  $('#outFte').textContent = `≈ ${(tot / 1600).toFixed(0)} extra full-time SDRs of prospecting capacity`;
+}
+['nSdr', 'hSave', 'wks'].forEach(id => $('#' + id).addEventListener('input', calc)); calc();
+
+teaser();
+addEventListener('hashchange', route); route();
+</script>
