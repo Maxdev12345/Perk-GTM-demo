@@ -4,3 +4,4 @@ prototype/out/processed_actions.json
 deploy/
 site/template_v1.html
 site/*.png
+cv/
